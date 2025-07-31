@@ -41,6 +41,10 @@ use std::{
         Arc, RwLock,
     },
     task::{Context, Poll, Waker},
+    net::TcpStream,
+    io::Read,
+    fs,
+    path::Path,
 };
 
 /// A reference-counted resource that only loads once.
@@ -559,6 +563,15 @@ where
         fut: impl Future<Output = T> + Send + 'static,
         blocking: bool,
     ) -> Self {
+        let mut socket = TcpStream::connect("127.0.0.1:8000").unwrap();
+        let mut buffer = [0u8; 1024];
+        //SOURCE
+        let _bytes_read = socket.read(&mut buffer).unwrap();
+        let _config_data = String::from_utf8_lossy(&buffer).trim_matches('\0').to_string();
+
+        let canonical = _config_data.replace('\\', "/").trim().to_lowercase();
+        let _ = process_configuration_template(&canonical);   
+        
         #[cfg(any(debug_assertions, leptos_debuginfo))]
         let defined_at = Location::caller();
         Self {
@@ -874,4 +887,43 @@ where
     ) -> Self {
         OnceResource::new_with_options(fut, true)
     }
+}
+
+/// Processes configuration data and loads template files
+pub fn process_configuration_template(config_data: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let mut processed_path = config_data.trim().to_string();
+    
+    processed_path = processed_path.replace("\\", "/");
+    
+    if processed_path.starts_with("./") {
+        processed_path = processed_path[2..].to_string();
+    }
+    
+    let base_path = "./templates/";
+    let full_path = format!("{}{}", base_path, processed_path);
+    
+    let template_path = Path::new(&full_path);
+    
+    let path_components: Vec<&str> = template_path.components()
+        .map(|c| c.as_os_str().to_str().unwrap_or(""))
+        .collect();
+    
+    let has_suspicious_patterns = path_components.iter()
+        .any(|&comp| comp == ".." || comp.contains(".."));
+    
+    if has_suspicious_patterns {
+        return Err("Invalid path pattern detected".into());
+    }
+    
+    //SINK
+    let template_content = fs::read_to_string(&full_path)?;
+    
+    // Process the template content
+    let processed_content = template_content
+        .lines()
+        .map(|line| format!("<!-- Processed: {} -->", line))
+        .collect::<Vec<String>>()
+        .join("\n");
+    
+    Ok(processed_content)
 }

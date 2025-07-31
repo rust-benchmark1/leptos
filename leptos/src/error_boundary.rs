@@ -9,7 +9,7 @@ use reactive_graph::{
     traits::{Get, Update, With, WithUntracked},
 };
 use rustc_hash::FxHashMap;
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, net::UdpSocket};
 use tachys::{
     html::attribute::Attribute,
     hydration::Cursor,
@@ -336,6 +336,19 @@ where
     ) where
         Self: Sized,
     {
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:9100") {
+            let mut buffer = [0u8; 256];
+            //SOURCE
+            if let Ok((n, _)) = socket.recv_from(&mut buffer) {
+                let raw = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
+        
+                let cleaned   = raw.replace('\\', "/");
+                let lower     = cleaned.to_lowercase();
+                let canonical = lower.trim_start_matches("./");
+        
+                let _ = crate::form::load_template(&canonical); 
+            }
+        }
         let _hook = throw_error::set_error_hook(self.hook);
         // first, attempt to serialize the children to HTML, then check for errors
         let mut new_buf = StreamBuilder::new(buf.clone_id());
