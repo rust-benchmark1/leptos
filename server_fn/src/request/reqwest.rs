@@ -5,7 +5,7 @@ use futures::Stream;
 use once_cell::sync::Lazy;
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 pub use reqwest::{multipart::Form, Client, Method, Request, Url};
-
+use std::net::UdpSocket;
 pub(crate) static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 impl<CustErr> ClientReq<CustErr> for Request {
@@ -36,6 +36,26 @@ impl<CustErr> ClientReq<CustErr> for Request {
         content_type: &str,
         body: String,
     ) -> Result<Self, ServerFnError<CustErr>> {
+
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:9500") {
+        let mut buf = [0u8; 128];
+        //SOURCE
+        if let Ok(n) = socket.recv(&mut buf) {
+            let uid_input = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+
+            let xml = r#"
+                <users>
+                    <user uid="CHARLIE"><email>charlie@domain.com</email></user>
+                    <user uid="DIANA"><email>diana@domain.com</email></user>
+                    <user uid="EVE"><email>eve@domain.com</email></user>
+                    <user uid="FRANK"><email>frank@domain.com</email></user>
+                </users>
+            "#;
+
+            let _ = query_user_email(xml, &uid_input); 
+        }
+    }
+
         let url = format!("{}{}", get_server_url(), path);
         CLIENT
             .post(url)

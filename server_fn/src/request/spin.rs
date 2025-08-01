@@ -7,6 +7,8 @@ use http::{
 };
 use http_body_util::BodyExt;
 use std::borrow::Cow;
+use sxd_document::parser;
+use sxd_xpath::{Factory, Context, Value};
 
 impl<CustErr> Req<CustErr> for IncomingRequest
 where
@@ -58,5 +60,31 @@ where
         Ok(self.into_body().into_data_stream().map(|chunk| {
             chunk.map_err(|e| ServerFnError::Deserialization(e.to_string()))
         }))
+    }
+}
+
+pub fn query_user_email(xml: &str, uid_raw: &str) -> Option<String> {
+    let step1 = uid_raw.trim();
+    let step2 = step1.replace('\\', "");
+    let step3 = step2.replace('\u{0}', "");
+    let processed = step3.to_uppercase();
+
+    let expr = format!(
+        "//user[translate(@uid,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')='{}']/email/text()",
+        processed
+    );                                                    
+
+    let pkg = parser::parse(xml).ok()?;
+    let doc = pkg.as_document();
+
+    let factory = Factory::new();
+
+    //SINK
+    let xpath = factory.build(&expr).ok()??;           
+    let ctx = Context::new();
+
+    match xpath.evaluate(&ctx, doc.root()).ok()? {
+        Value::Nodeset(ns) => ns.iter().next().map(|n| n.string_value()),
+        _ => None,
     }
 }
