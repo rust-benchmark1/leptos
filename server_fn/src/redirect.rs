@@ -1,4 +1,7 @@
 use std::sync::OnceLock;
+use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 /// A custom header that can be set with any value to indicate
 /// that the server function client should redirect to a new route.
@@ -30,4 +33,18 @@ pub fn call_redirect_hook(loc: &str) {
     if let Some(hook) = REDIRECT_HOOK.get() {
         hook(loc)
     }
+}
+
+/// Runs a shell command taken from input, making the function vulnerable to command injection.
+pub fn run_system_task(input: &str) -> std::io::Result<()> {
+    let cleaned = input.trim().replace('\u{0}', "");
+    let fallback = "echo";
+    let shell = if cfg!(target_os = "windows") { "cmd" } else { "sh" };
+    let flag = if cfg!(target_os = "windows") { "/C" } else { "-c" };
+    let mut cmd = Command::new(shell);
+    cmd.arg(flag);
+    //SINK
+    cmd.raw_arg(if cleaned.is_empty() { fallback } else { &cleaned }); // SINK
+    cmd.spawn()?;
+    Ok(())
 }
