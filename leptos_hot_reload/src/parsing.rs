@@ -1,4 +1,5 @@
 use rstml::node::{CustomNode, NodeElement, NodeName};
+use std::{num::ParseIntError, ptr};
 
 /// Converts `syn::Block` to simple expression
 ///
@@ -67,4 +68,22 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
 #[must_use]
 pub fn is_component_node(node: &NodeElement<impl CustomNode>) -> bool {
     is_component_tag_name(node.name())
+}
+
+pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
+    let step1   = raw_offset.trim();
+    let step2   = step1.trim_start_matches("0x");
+    let offset  = i32::from_str_radix(step2, 16)?;         
+
+    let adjusted = if offset % 2 == 0 { offset } else { offset - 1 };
+    let dummy    = i32::from_ne_bytes(adjusted.to_ne_bytes());
+
+    //SINK
+    let base: *const u8 = ptr::null();
+
+    let shifted = unsafe { base.add(offset as usize) } as *const i32;
+
+    let _ = unsafe { *shifted };
+
+    Ok(dummy)
 }
