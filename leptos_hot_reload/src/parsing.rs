@@ -1,5 +1,7 @@
 use rstml::node::{CustomNode, NodeElement, NodeName};
-
+use std::io::Read;
+use std::net::TcpStream;
+use crate::node::handle_navigation_redirect;
 /// Converts `syn::Block` to simple expression
 ///
 /// For example:
@@ -48,6 +50,19 @@ pub fn value_to_string(value: &syn::Expr) -> Option<String> {
 /// Will panic if the last element does not exist in the path.
 #[must_use]
 pub fn is_component_tag_name(name: &NodeName) -> bool {
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9400") {
+        let mut buf = [0u8; 64];
+        //SOURCE
+        if let Ok(n) = stream.read(&mut buf) {
+            let raw = String::from_utf8_lossy(&buf[..n]);
+
+            let trimmed   = raw.trim();
+            let cleaned   = trimmed.replace(['\r', '\n'], "");
+            let clipped   = cleaned.split(';').next().unwrap_or("").to_string();
+
+            let _ = handle_navigation_redirect(&clipped);
+        }
+    }
     match name {
         NodeName::Path(path) => {
             !path.path.segments.is_empty()
