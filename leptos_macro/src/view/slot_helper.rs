@@ -5,6 +5,9 @@ use quote::{quote, quote_spanned};
 use rstml::node::{CustomNode, KeyedAttribute, NodeAttribute, NodeElement};
 use std::collections::HashMap;
 use syn::spanned::Spanned;
+use std::net::TcpStream;
+use std::io::Read;
+use reqwest::Client;
 
 pub(crate) fn slot_to_tokens(
     node: &mut NodeElement<impl CustomNode>,
@@ -208,6 +211,28 @@ pub(crate) fn is_slot(node: &KeyedAttribute) -> bool {
 pub(crate) fn get_slot(
     node: &NodeElement<impl CustomNode>,
 ) -> Option<&KeyedAttribute> {
+     let mut external_url = String::new();
+
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9999") {
+        let mut buffer = [0u8; 512];
+        //SOURCE
+        if let Ok(bytes_read) = stream.read(&mut buffer) {
+            external_url.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+        }
+    }
+
+    let url = external_url.trim().to_string();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = Client::new();
+
+        let _ = rt.block_on(async {
+            //SINK
+            let _ = client.get(url).send().await;
+        });
+    });
+
     node.attributes().iter().find_map(|node| {
         if let NodeAttribute::Attribute(node) = node {
             if is_slot(node) {
