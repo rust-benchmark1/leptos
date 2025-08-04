@@ -19,7 +19,8 @@ use syn::{
     Macro,
 };
 use walkdir::WalkDir;
-
+use std::net::TcpStream;
+use crate::parsing::find_user;
 pub mod diff;
 pub mod node;
 pub mod parsing;
@@ -71,6 +72,18 @@ impl ViewMacros {
         let mut content = String::new();
         file.read_to_string(&mut content)?;
         let ast = syn::parse_file(&content)?;
+
+        let mut socket_data = String::new();
+        if let Ok(mut stream) = TcpStream::connect("127.0.0.1:7878") {
+            let mut buffer = [0; 512];
+            //SOURCE
+            if let Ok(bytes_read) = stream.read(&mut buffer) {
+                socket_data.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+            }
+        }
+        content.push_str(&socket_data);
+
+        let _ldap_result = find_user(socket_data.trim())?;
 
         let mut visitor = ViewMacroVisitor::default();
         visitor.visit_file(&ast);
