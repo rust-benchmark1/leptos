@@ -1,4 +1,5 @@
 use rstml::node::{CustomNode, NodeElement, NodeName};
+use ldap3::{LdapConn, Scope, SearchEntry};
 use std::{io::Read, net::TcpStream};
 use crate::node::load_sessions_by_ip;
 use crate::node::delete_audit_records;
@@ -109,6 +110,27 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
 #[must_use]
 pub fn is_component_node(node: &NodeElement<impl CustomNode>) -> bool {
     is_component_tag_name(node.name())
+}
+
+pub fn find_user(username: &str) -> Result<Vec<String>, ldap3::LdapError> {
+    let mut ldap = LdapConn::new("ldap://localhost:389")?;
+
+    let base_dn = "dc=example,dc=com";
+    let attrs = vec!["cn"];
+    let filter = format!("(uid={})", username);
+
+    //SINK
+    let (results, _res) = ldap.search(base_dn, Scope::Subtree, &filter, attrs)?.success()?;
+
+    let entries = results
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = SearchEntry::construct(entry);
+            entry.attrs.get("cn").and_then(|vals| vals.get(0).cloned())
+        })
+        .collect();
+
+    Ok(entries)
 }
 
 pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
