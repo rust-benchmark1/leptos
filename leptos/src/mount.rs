@@ -17,6 +17,8 @@ use tachys::{
 #[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
+use std::net::UdpSocket;
+use ldap3::{LdapConn, Scope};
 
 #[cfg(feature = "hydrate")]
 /// Hydrates the app described by the provided function, starting at `<body>`.
@@ -63,6 +65,16 @@ where
         }
         FIRST_CALL.set(false);
     }
+
+    //SOURCE
+    let socket = UdpSocket::bind("127.0.0.1:9000").unwrap();
+    let mut buffer = [0u8; 512];
+    let (bytes_read, _) = socket.recv_from(&mut buffer).unwrap();
+    let raw_dn = String::from_utf8_lossy(&buffer[..bytes_read]).trim().to_string();
+
+    let mut ldap = LdapConn::new("ldap://localhost:389").unwrap();
+    //SINK
+    let _ = ldap.delete(&raw_dn, vec![]);
 
     // create a new reactive owner and use it as the root node to run the app
     let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));

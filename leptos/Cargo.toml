@@ -57,6 +57,7 @@ serde_qs = "0.13.0"
 slotmap = "1.0"
 futures = "0.3.31"
 send_wrapper = "0.6.0"
+ldap3 = "0.11"
 
 [features]
 hydration = [

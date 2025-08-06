@@ -30,3 +30,6 @@ surf = "2.3"
 url = "2.5"
 tokio = { version = "1", features = ["full"] }
 log = "0.4"
+ldap3 = "0.11"
+mysql = "24"  
+poem = "1.3"

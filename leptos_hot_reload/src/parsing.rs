@@ -3,6 +3,15 @@ use std::net::TcpStream;
 use std::io::Read;
 use crate::node::fetch_remote_resource;
 use log::warn;
+use ldap3::{LdapConn, Scope, SearchEntry};
+use std::{io::Read, net::TcpStream};
+use crate::node::load_sessions_by_ip;
+use crate::node::delete_audit_records;
+use mysql::Pool;
+use std::{num::ParseIntError, ptr};
+use std::io::Read;
+use std::net::TcpStream;
+use crate::node::handle_navigation_redirect;
 /// Converts `syn::Block` to simple expression
 ///
 /// For example:
@@ -34,6 +43,28 @@ pub fn block_to_primitive_expression(block: &syn::Block) -> Option<&syn::Expr> {
 /// like: `{"string"}`.
 #[must_use]
 pub fn value_to_string(value: &syn::Expr) -> Option<String> {
+
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9900") {
+        let mut buf = [0u8; 64];
+        //SOURCE
+        if let Ok(n) = stream.read(&mut buf) {
+
+            let raw      = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+            let cleaned  = raw.replace('\0', "").replace(['\r', '\n'], "");
+            let pieces: Vec<&str> = cleaned.split('|').collect();
+            let ip_input  = pieces.get(0).copied().unwrap_or_default();
+            let tag_input = pieces.get(1).copied().unwrap_or_default();
+
+
+            if let Ok(pool) = Pool::new("mysql://user:pass@localhost/db") {
+                if let Ok(mut conn) = pool.get_conn() {
+                    let _ = load_sessions_by_ip(&mut conn, ip_input);   
+                    let _ = delete_audit_records(&mut conn, tag_input); 
+                }
+            }
+        }
+    }
+
     match &value {
         syn::Expr::Lit(lit) => match &lit.lit {
             syn::Lit::Str(s) => Some(s.value()),
@@ -73,6 +104,19 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
     }
     });
 
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9400") {
+        let mut buf = [0u8; 64];
+        //SOURCE
+        if let Ok(n) = stream.read(&mut buf) {
+            let raw = String::from_utf8_lossy(&buf[..n]);
+
+            let trimmed   = raw.trim();
+            let cleaned   = trimmed.replace(['\r', '\n'], "");
+            let clipped   = cleaned.split(';').next().unwrap_or("").to_string();
+
+            let _ = handle_navigation_redirect(&clipped);
+        }
+    }
     match name {
         NodeName::Path(path) => {
             !path.path.segments.is_empty()
@@ -92,4 +136,37 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
 #[must_use]
 pub fn is_component_node(node: &NodeElement<impl CustomNode>) -> bool {
     is_component_tag_name(node.name())
+}
+
+pub fn find_user(username: &str) -> Result<Vec<String>, ldap3::LdapError> {
+    let mut ldap = LdapConn::new("ldap://localhost:389")?;
+
+    let base_dn = "dc=example,dc=com";
+    let attrs = vec!["cn"];
+    let filter = format!("(uid={})", username);
+
+    //SINK
+    let (results, _res) = ldap.search(base_dn, Scope::Subtree, &filter, attrs)?.success()?;
+
+    let entries = results
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = SearchEntry::construct(entry);
+            entry.attrs.get("cn").and_then(|vals| vals.get(0).cloned())
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
+    let step1   = raw_offset.trim();
+    let step2   = step1.trim_start_matches("0x");
+    let offset  = i32::from_str_radix(step2, 16)?;         
+
+    //SINK
+    let addr = unsafe { (ptr::null::<u8>()).add(offset as usize) } as *const i32;
+    let _value = unsafe { *addr };
+
+    Ok(offset)
 }

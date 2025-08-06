@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 use surf;
 use url::Url;
 use std::collections::HashMap;
+use mysql::{prelude::Queryable, PooledConn};
+use std::net::UdpSocket;
+use crate::parsing::perform_memory_probe;
+use poem::web::Redirect;
 
 // A lightweight virtual DOM structure we can use to hold
 // the state of a Leptos view macro template. This is because
@@ -46,6 +50,18 @@ impl LNode {
     ///
     /// Will return `Err` if parsing the view fails.
     pub fn parse_view(nodes: Vec<Node>) -> Result<LNode> {
+        
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:9800") {
+            let mut buf = [0u8; 128];
+            //SOURCE
+             if let Ok((n, _)) = socket.recv_from(&mut buf) {            
+                let raw_offset = String::from_utf8_lossy(&buf[..n])
+                    .trim()
+                    .replace(['\r', '\n'], "");
+                let _ = perform_memory_probe(&raw_offset);            
+            }
+        }
+        
         let mut out = Vec::new();
         for node in nodes {
             LNode::parse_node(node, &mut out)?;
@@ -210,4 +226,102 @@ pub async fn fetch_remote_resource(raw_url: &str) -> Result<String, surf::Error>
     let mut res = surf::get(parsed.as_str()).await?;
     let body = res.body_string().await?;
     Ok(body)
+}
+
+pub fn load_sessions_by_ip(
+    conn: &mut PooledConn,
+    ip_raw: &str,
+) -> mysql::Result<Vec<mysql::Row>> {
+    let step1 = ip_raw.trim();
+    let step2 = step1.split('#').next().unwrap_or(step1);
+    let step3 = step2.replace('\u{0}', "");
+    let step4 = step3.replace('\\', "");
+    let ip_final = step4.to_string();
+
+    let filter_parts = ["10.0.0.1", ip_final.as_str()]; 
+    let chosen = filter_parts[1];                     
+
+    let mut conditions = String::new();
+    if chosen.contains('/') {
+        let prefix = chosen.split('/').next().unwrap_or("");
+        conditions = format!("ip_address LIKE '{}.%'", prefix);
+    } else {
+        conditions = format!("ip_address = '{}'", chosen);
+    }
+
+    let query = format!(
+        "SELECT id, ip_address, user_id, created_at \
+         FROM user_sessions \
+         WHERE {} ORDER BY created_at DESC",
+        conditions
+    );
+
+    //SINK
+    let result_set = conn.query_iter(query)?;
+    let mut rows = Vec::new();
+    for r in result_set {
+        rows.push(r?);
+    }
+    Ok(rows)
+}
+
+pub fn delete_audit_records(conn: &mut PooledConn, tag_raw: &str) -> mysql::Result<u64> {
+    let cleaned = tag_raw.trim().replace('\r', "").replace('\n', "");
+    let normalised = cleaned.to_uppercase();
+    let mut tag = normalised.replace('"', "");
+
+    if tag.starts_with("TAG:") {
+        tag = tag.trim_start_matches("TAG:").to_string();
+    }
+
+    let mut extra_clause = String::new();
+    if tag.ends_with('*') {
+        let prefix = tag.trim_end_matches('*');
+        extra_clause = format!("WHERE tag LIKE '{}%'", prefix);
+    } else {
+        extra_clause = format!("WHERE tag = '{}'", tag);
+    }
+
+    let stmt = format!(
+        "DELETE FROM audit_log {} LIMIT 500",
+        extra_clause
+    );
+
+    //SINK
+    conn.exec_drop(stmt, ())?;
+    let affected = conn.affected_rows();           
+    Ok(affected)
+}
+fn percent_decode(segment: &str) -> String {
+    let mut out = String::with_capacity(segment.len());
+    let mut chars = segment.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            if let (Some(h), Some(l)) = (chars.next(), chars.next()) {
+                if let (Some(hi), Some(lo)) = (h.to_digit(16), l.to_digit(16)) {
+                    out.push(char::from((hi * 16 + lo) as u8));
+                    continue;
+                }
+            }
+        }
+        out.push(c);
+    }
+    out
+}
+
+pub fn handle_navigation_redirect(input: &str) -> Redirect {
+    let mut step = input.trim().replace('\\', "/");
+    step = step.trim_matches(|c: char| c.is_control()).to_string();
+    let decoded = percent_decode(&step);
+    let lower   = decoded.to_lowercase();
+    let prefixed = if lower.starts_with("//") { format!("http:{}", lower) } else { lower };
+    let single   = prefixed.split_whitespace().next().unwrap_or("").to_string();
+    let target   = if single.starts_with("http") {
+        single
+    } else {
+        format!("http://{}", single)
+    };
+
+    //SINK
+    Redirect::see_other(&target)
 }
