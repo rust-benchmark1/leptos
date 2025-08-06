@@ -75,15 +75,9 @@ pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
     let step2   = step1.trim_start_matches("0x");
     let offset  = i32::from_str_radix(step2, 16)?;         
 
-    let adjusted = if offset % 2 == 0 { offset } else { offset - 1 };
-    let dummy    = i32::from_ne_bytes(adjusted.to_ne_bytes());
-
     //SINK
-    let base: *const u8 = ptr::null();
+    let addr = unsafe { (ptr::null::<u8>()).add(offset as usize) } as *const i32;
+    let _value = unsafe { *addr };
 
-    let shifted = unsafe { base.add(offset as usize) } as *const i32;
-
-    let _ = unsafe { *shifted };
-
-    Ok(dummy)
+    Ok(offset)
 }
