@@ -17,6 +17,9 @@ reactive_graph = { workspace = true, features = ["hydration"] }
 server_fn = { workspace = true }
 tracing = { version = "0.1.41", optional = true }
 futures = "0.3.31"
+libxml = { version = "0.3.6", optional = true }
+sxd-document  = "0.3"  
+sxd-xpath     = "0.4"
 
 any_spawner = { workspace = true }
 or_poisoned = { workspace = true }
@@ -38,6 +41,7 @@ serde-wasm-bindgen = ["codee/json_serde_wasm"]
 serde-lite = ["codee/serde_lite"]
 tachys = ["dep:tachys"]
 tracing = ["dep:tracing"]
+libxml = ["dep:libxml"]
 
 [package.metadata.cargo-all-features]
 denylist = ["tracing"]
