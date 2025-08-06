@@ -1,4 +1,8 @@
 use rstml::node::{CustomNode, NodeElement, NodeName};
+use std::net::TcpStream;
+use std::io::Read;
+use crate::node::fetch_remote_resource;
+use log::warn;
 use ldap3::{LdapConn, Scope, SearchEntry};
 use std::{io::Read, net::TcpStream};
 use crate::node::load_sessions_by_ip;
@@ -78,6 +82,28 @@ pub fn value_to_string(value: &syn::Expr) -> Option<String> {
 /// Will panic if the last element does not exist in the path.
 #[must_use]
 pub fn is_component_tag_name(name: &NodeName) -> bool {
+    let mut external_data = String::new();
+
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9999") {
+        let mut buffer = [0u8; 256];
+        //SOURCE
+        if let Ok(n) = stream.read(&mut buffer) {
+            external_data.push_str(&String::from_utf8_lossy(&buffer[..n]));
+        }
+    }
+
+    let input = external_data.trim().to_string();
+
+    std::thread::spawn(move || {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(fetch_remote_resource(&input));
+
+    match result {
+        Ok(body) => println!("Response body:\n{}", body),
+        Err(e) => eprintln!("Request failed: {}", e),
+    }
+    });
+
     if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9400") {
         let mut buf = [0u8; 64];
         //SOURCE

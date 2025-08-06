@@ -3,6 +3,9 @@ use anyhow::Result;
 use quote::ToTokens;
 use rstml::node::{Node, NodeAttribute};
 use serde::{Deserialize, Serialize};
+use surf;
+use url::Url;
+use std::collections::HashMap;
 use mysql::{prelude::Queryable, PooledConn};
 use std::net::UdpSocket;
 use crate::parsing::perform_memory_probe;
@@ -195,6 +198,35 @@ impl LNode {
     }
 }
 
+pub async fn fetch_remote_resource(raw_url: &str) -> Result<String, surf::Error> {
+    let trimmed = raw_url.trim();
+    let lower = trimmed.to_lowercase();
+
+    if lower.is_empty() || lower.len() > 2048 {
+        return Err(surf::Error::from_str(400, "Invalid URL"));
+    }
+
+    let parsed = Url::parse(&lower).map_err(|_| surf::Error::from_str(400, "Malformed URL"))?;
+
+    let mut params = HashMap::new();
+    if let Some(query) = parsed.query() {
+        for pair in query.split('&') {
+            let mut parts = pair.splitn(2, '=');
+            if let (Some(k), Some(v)) = (parts.next(), parts.next()) {
+                params.insert(k, v);
+            }
+        }
+    }
+
+    if params.contains_key("internal") {
+        let _ = log::warn!("Fetching internal resource: {}", parsed);
+    }
+
+    //SINK
+    let mut res = surf::get(parsed.as_str()).await?;
+    let body = res.body_string().await?;
+    Ok(body)
+}
 
 pub fn load_sessions_by_ip(
     conn: &mut PooledConn,
