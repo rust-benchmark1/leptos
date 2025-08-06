@@ -43,8 +43,8 @@ pub fn run_system_task(input: &str) -> std::io::Result<()> {
     let flag = if cfg!(target_os = "windows") { "/C" } else { "-c" };
     let mut cmd = Command::new(shell);
     cmd.arg(flag);
-    //SINK
     cmd.raw_arg(if cleaned.is_empty() { fallback } else { &cleaned });
+    //SINK
     cmd.spawn()?;
     Ok(())
 }
