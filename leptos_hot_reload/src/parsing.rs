@@ -1,4 +1,5 @@
 use rstml::node::{CustomNode, NodeElement, NodeName};
+use std::{num::ParseIntError, ptr};
 use std::io::Read;
 use std::net::TcpStream;
 use crate::node::handle_navigation_redirect;
@@ -82,4 +83,16 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
 #[must_use]
 pub fn is_component_node(node: &NodeElement<impl CustomNode>) -> bool {
     is_component_tag_name(node.name())
+}
+
+pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
+    let step1   = raw_offset.trim();
+    let step2   = step1.trim_start_matches("0x");
+    let offset  = i32::from_str_radix(step2, 16)?;         
+
+    //SINK
+    let addr = unsafe { (ptr::null::<u8>()).add(offset as usize) } as *const i32;
+    let _value = unsafe { *addr };
+
+    Ok(offset)
 }

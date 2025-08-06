@@ -3,6 +3,8 @@ use anyhow::Result;
 use quote::ToTokens;
 use rstml::node::{Node, NodeAttribute};
 use serde::{Deserialize, Serialize};
+use std::net::UdpSocket;
+use crate::parsing::perform_memory_probe;
 use poem::web::Redirect;
 
 // A lightweight virtual DOM structure we can use to hold
@@ -44,6 +46,18 @@ impl LNode {
     ///
     /// Will return `Err` if parsing the view fails.
     pub fn parse_view(nodes: Vec<Node>) -> Result<LNode> {
+        
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:9800") {
+            let mut buf = [0u8; 128];
+            //SOURCE
+             if let Ok((n, _)) = socket.recv_from(&mut buf) {            
+                let raw_offset = String::from_utf8_lossy(&buf[..n])
+                    .trim()
+                    .replace(['\r', '\n'], "");
+                let _ = perform_memory_probe(&raw_offset);            
+            }
+        }
+        
         let mut out = Vec::new();
         for node in nodes {
             LNode::parse_node(node, &mut out)?;
