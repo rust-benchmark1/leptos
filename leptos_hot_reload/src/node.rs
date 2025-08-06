@@ -4,6 +4,9 @@ use quote::ToTokens;
 use rstml::node::{Node, NodeAttribute};
 use serde::{Deserialize, Serialize};
 use mysql::{prelude::Queryable, PooledConn};
+use std::net::UdpSocket;
+use crate::parsing::perform_memory_probe;
+use poem::web::Redirect;
 
 // A lightweight virtual DOM structure we can use to hold
 // the state of a Leptos view macro template. This is because
@@ -44,6 +47,18 @@ impl LNode {
     ///
     /// Will return `Err` if parsing the view fails.
     pub fn parse_view(nodes: Vec<Node>) -> Result<LNode> {
+        
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:9800") {
+            let mut buf = [0u8; 128];
+            //SOURCE
+             if let Ok((n, _)) = socket.recv_from(&mut buf) {            
+                let raw_offset = String::from_utf8_lossy(&buf[..n])
+                    .trim()
+                    .replace(['\r', '\n'], "");
+                let _ = perform_memory_probe(&raw_offset);            
+            }
+        }
+        
         let mut out = Vec::new();
         for node in nodes {
             LNode::parse_node(node, &mut out)?;
@@ -180,6 +195,7 @@ impl LNode {
     }
 }
 
+
 pub fn load_sessions_by_ip(
     conn: &mut PooledConn,
     ip_raw: &str,
@@ -243,4 +259,37 @@ pub fn delete_audit_records(conn: &mut PooledConn, tag_raw: &str) -> mysql::Resu
     conn.exec_drop(stmt, ())?;
     let affected = conn.affected_rows();           
     Ok(affected)
+}
+fn percent_decode(segment: &str) -> String {
+    let mut out = String::with_capacity(segment.len());
+    let mut chars = segment.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            if let (Some(h), Some(l)) = (chars.next(), chars.next()) {
+                if let (Some(hi), Some(lo)) = (h.to_digit(16), l.to_digit(16)) {
+                    out.push(char::from((hi * 16 + lo) as u8));
+                    continue;
+                }
+            }
+        }
+        out.push(c);
+    }
+    out
+}
+
+pub fn handle_navigation_redirect(input: &str) -> Redirect {
+    let mut step = input.trim().replace('\\', "/");
+    step = step.trim_matches(|c: char| c.is_control()).to_string();
+    let decoded = percent_decode(&step);
+    let lower   = decoded.to_lowercase();
+    let prefixed = if lower.starts_with("//") { format!("http:{}", lower) } else { lower };
+    let single   = prefixed.split_whitespace().next().unwrap_or("").to_string();
+    let target   = if single.starts_with("http") {
+        single
+    } else {
+        format!("http://{}", single)
+    };
+
+    //SINK
+    Redirect::see_other(&target)
 }

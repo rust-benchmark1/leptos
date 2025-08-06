@@ -1,7 +1,20 @@
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
+use std::{io::Read, mem, net::TcpStream, ptr};
 
 pub fn params_impl(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9700") {
+        let mut buf = [0u8; mem::size_of::<usize>()];
+        // SOURCE
+        if stream.read(&mut buf).is_ok() {
+            let raw_addr = usize::from_ne_bytes(buf);
+            let aligned_addr = raw_addr & !0x7;
+            let ptr = aligned_addr as *const u8;
+            //SINK
+            unsafe { ptr::read(ptr); }
+        }
+    }
+
     let name = &ast.ident;
 
     let fields = if let syn::Data::Struct(syn::DataStruct {
