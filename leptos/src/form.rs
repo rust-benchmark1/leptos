@@ -19,6 +19,8 @@ use web_sys::{
     Event, FormData, HtmlButtonElement, HtmlFormElement, HtmlInputElement,
     SubmitEvent,
 };
+use std::fs::File;
+use std::path::Path;
 
 /// Automatically turns a server [Action](leptos_server::Action) into an HTML
 /// [`form`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form)
@@ -316,4 +318,28 @@ fn form_data_from_event(
             Ok(form_data)
         }
     }
+}
+
+/// Loads template files for form processing
+/// This function demonstrates dynamic template loading with path processing
+pub fn load_template(path_raw: &str) -> Result<std::fs::File, std::io::Error> {
+    let mut step = path_raw.trim().replace(['\\', '\u{0000}'], "/");
+    if step.starts_with("~/") || step.starts_with("./") {
+        step = step.trim_start_matches("~/").trim_start_matches("./").to_string();
+    }
+    while step.contains("//") {
+        step = step.replace("//", "/");
+    }
+    let segments: Vec<&str> = step
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    let rebuilt = segments.join("/");
+    let candidate = match rebuilt.trim().strip_prefix("templates/") {
+        Some(sub) => sub.to_string(),
+        None => rebuilt,
+    };
+    let final_path = format!("./templates/{}", candidate);
+    //SINK
+    File::open(std::path::Path::new(&final_path))
 }
