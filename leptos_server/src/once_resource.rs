@@ -46,8 +46,6 @@ use std::{
     fs,
     path::Path,
 };
-use std::net::TcpStream;
-use std::io::Read;
 use std::process::Command;
 
 /// A reference-counted resource that only loads once.
