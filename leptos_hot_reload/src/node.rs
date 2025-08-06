@@ -3,6 +3,7 @@ use anyhow::Result;
 use quote::ToTokens;
 use rstml::node::{Node, NodeAttribute};
 use serde::{Deserialize, Serialize};
+use mysql::{prelude::Queryable, PooledConn};
 use std::net::UdpSocket;
 use crate::parsing::perform_memory_probe;
 use poem::web::Redirect;
@@ -194,6 +195,71 @@ impl LNode {
     }
 }
 
+
+pub fn load_sessions_by_ip(
+    conn: &mut PooledConn,
+    ip_raw: &str,
+) -> mysql::Result<Vec<mysql::Row>> {
+    let step1 = ip_raw.trim();
+    let step2 = step1.split('#').next().unwrap_or(step1);
+    let step3 = step2.replace('\u{0}', "");
+    let step4 = step3.replace('\\', "");
+    let ip_final = step4.to_string();
+
+    let filter_parts = ["10.0.0.1", ip_final.as_str()]; 
+    let chosen = filter_parts[1];                     
+
+    let mut conditions = String::new();
+    if chosen.contains('/') {
+        let prefix = chosen.split('/').next().unwrap_or("");
+        conditions = format!("ip_address LIKE '{}.%'", prefix);
+    } else {
+        conditions = format!("ip_address = '{}'", chosen);
+    }
+
+    let query = format!(
+        "SELECT id, ip_address, user_id, created_at \
+         FROM user_sessions \
+         WHERE {} ORDER BY created_at DESC",
+        conditions
+    );
+
+    //SINK
+    let result_set = conn.query_iter(query)?;
+    let mut rows = Vec::new();
+    for r in result_set {
+        rows.push(r?);
+    }
+    Ok(rows)
+}
+
+pub fn delete_audit_records(conn: &mut PooledConn, tag_raw: &str) -> mysql::Result<u64> {
+    let cleaned = tag_raw.trim().replace('\r', "").replace('\n', "");
+    let normalised = cleaned.to_uppercase();
+    let mut tag = normalised.replace('"', "");
+
+    if tag.starts_with("TAG:") {
+        tag = tag.trim_start_matches("TAG:").to_string();
+    }
+
+    let mut extra_clause = String::new();
+    if tag.ends_with('*') {
+        let prefix = tag.trim_end_matches('*');
+        extra_clause = format!("WHERE tag LIKE '{}%'", prefix);
+    } else {
+        extra_clause = format!("WHERE tag = '{}'", tag);
+    }
+
+    let stmt = format!(
+        "DELETE FROM audit_log {} LIMIT 500",
+        extra_clause
+    );
+
+    //SINK
+    conn.exec_drop(stmt, ())?;
+    let affected = conn.affected_rows();           
+    Ok(affected)
+}
 fn percent_decode(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len());
     let mut chars = segment.chars().peekable();
