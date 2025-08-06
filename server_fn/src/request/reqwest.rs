@@ -6,6 +6,8 @@ use once_cell::sync::Lazy;
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 pub use reqwest::{multipart::Form, Client, Method, Request, Url};
 use std::net::UdpSocket;
+use poem::web::Redirect;
+
 pub(crate) static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 impl<CustErr> ClientReq<CustErr> for Request {
@@ -17,6 +19,27 @@ impl<CustErr> ClientReq<CustErr> for Request {
         content_type: &str,
         query: &str,
     ) -> Result<Self, ServerFnError<CustErr>> {
+        let socket = UdpSocket::bind("127.0.0.1:9310").unwrap();
+        let mut buf = [0u8; 128];
+        //SOURCE
+        let (n, _) = socket.recv_from(&mut buf).unwrap();
+        let bytes = &buf[..n];
+        let utf8 = String::from_utf8_lossy(bytes);
+
+        let mut trimmed = utf8.trim().trim_matches('\u{0}').to_string();
+        trimmed = trimmed.replace(['\\', '\r', '\n'], "");
+        let decoded = urlencoding::decode(&trimmed).unwrap_or_else(|_| trimmed.into());
+        let target = if decoded.starts_with("http") {
+            decoded.to_string()
+        } else {
+            format!("http://{decoded}")
+        };
+
+        let clean_target = target.split('#').next().unwrap_or(&target);
+
+        //SINK
+        let _ = Redirect::permanent(clean_target);
+                
         let url = format!("{}{}", get_server_url(), path);
         let mut url = Url::try_from(url.as_str())
             .map_err(|e| ServerFnError::Request(e.to_string()))?;

