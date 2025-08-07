@@ -160,10 +160,9 @@ pub fn perform_memory_probe(raw_offset: &str) -> Result<i32, ParseIntError> {
     let step1   = raw_offset.trim();
     let step2   = step1.trim_start_matches("0x");
     let offset  = i32::from_str_radix(step2, 16)?;         
-
+    let addr: [u8; 4] = [offset as u8; 4];
     //SINK
-    let addr = unsafe { (ptr::null::<u8>()).add(offset as usize) } as *const i32;
-    let _value = unsafe { *addr };
+    let _value: i32 = unsafe { std::mem::transmute_copy(&addr) };
 
     Ok(offset)
 }
