@@ -7,7 +7,7 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE};
 pub use reqwest::{multipart::Form, Client, Method, Request, Url};
 use std::net::UdpSocket;
 use poem::web::Redirect;
-
+use urlencoding;
 pub(crate) static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 impl<CustErr> ClientReq<CustErr> for Request {
