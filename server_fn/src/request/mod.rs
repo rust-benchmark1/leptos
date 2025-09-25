@@ -17,7 +17,8 @@ pub mod generic;
 /// Request types for [`reqwest`].
 #[cfg(feature = "reqwest")]
 pub mod reqwest;
-
+/// Request types for Spin integration (helpers and custom handlers)
+pub mod spin;
 /// Represents a request as made by the client.
 pub trait ClientReq<CustErr>
 where
