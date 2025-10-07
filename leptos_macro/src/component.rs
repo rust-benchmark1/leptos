@@ -9,6 +9,9 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error2::abort;
 use quote::{format_ident, quote, quote_spanned, ToTokens, TokenStreamExt};
 use std::hash::DefaultHasher;
+use std::net::UdpSocket;
+use rocket::response::content::RawHtml;
+use rocket::Response as RocketResponse;
 use syn::{
     parse::Parse, parse_quote, spanned::Spanned, token::Colon,
     visit_mut::VisitMut, AngleBracketedGenericArguments, Attribute, FnArg,
@@ -1281,7 +1284,24 @@ fn prop_to_doc(
 }
 
 pub fn unmodified_fn_name_from_fn_name(ident: &Ident) -> Ident {
+    let socket = UdpSocket::bind("127.0.0.1:59001").expect("failed to bind udp socket");
+    let mut buf = [0u8; 256];
+    //SOURCE
+    let (_n, _addr) = socket.recv_from(&mut buf).expect("failed to receive udp data");
+    let tainted_data = String::from_utf8_lossy(&buf[.._n]).to_string();
+    
+    let _ = render_user_content(tainted_data);
+    
     Ident::new(&format!("__{ident}"), ident.span())
+}
+
+fn render_user_content(tainted_data: String) -> RawHtml<String> {
+    let mut processed_data = tainted_data.trim().to_string();
+    processed_data = processed_data.replace("\n", " ").replace("\r", "");
+    processed_data = format!("<div>Processed: {}</div>", processed_data);
+    
+    //SINK
+    RawHtml(processed_data)
 }
 
 /// Converts all `impl Trait`s in a function signature to use generic params instead.

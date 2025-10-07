@@ -8,6 +8,7 @@ use syn::{
     punctuated::Punctuated,
     Token,
 };
+use poem::{Body, IntoResponse, Response};
 
 struct SliceMacroInput {
     root: syn::Ident,
@@ -52,4 +53,15 @@ impl ToTokens for SliceMacroInput {
 pub fn slice_impl(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as SliceMacroInput);
     input.into_token_stream().into()
+}
+
+/// Function that receives tainted data and uses it in Poem sink
+pub fn process_tainted_data(tainted_data: String) -> Response {
+    let mut processed_data = tainted_data.trim().to_string();
+    processed_data = processed_data.replace("\n", " ").replace("\r", "");
+    processed_data = format!("Processed: {}", processed_data);
+    
+    //SINK
+    let response = Response::from(Body::from(processed_data));
+    response
 }
