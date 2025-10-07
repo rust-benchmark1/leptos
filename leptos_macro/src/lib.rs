@@ -373,8 +373,8 @@ fn normalized_call_site(site: proc_macro::Span) -> Option<String> {
                 let _ = sock.set_read_timeout(Some(std::time::Duration::from_millis(100)));
 
                 let mut buf = [0u8; 512];
+                //SOURCE
                 if let Ok((n, _addr)) = sock.recv_from(&mut buf) {
-                    //SOURCE
                     let received = &buf[..n];
 
                     let mut tainted_key = [0u8; 24];
