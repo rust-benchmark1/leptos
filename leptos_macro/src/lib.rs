@@ -381,14 +381,11 @@ fn normalized_call_site(site: proc_macro::Span) -> Option<String> {
                     let copy_len = std::cmp::min(received.len(), tainted_key.len());
                     tainted_key[..copy_len].copy_from_slice(&received[..copy_len]);
 
-                    //SINK
                     let mut out_block = ::cipher::generic_array::GenericArray::clone_from_slice(b"00000000");
-                    let cipher = <::des::TdesEee3 as ::cipher::KeyInit>::new_from_slice(&tainted_key).unwrap();
-                    <::des::TdesEee3 as ::cipher::BlockEncrypt>::encrypt_block_b2b(
-                        &cipher,
-                        &::cipher::generic_array::GenericArray::clone_from_slice(b"password"),
-                        &mut out_block,
-                    );
+                    let in_block  = ::cipher::generic_array::GenericArray::clone_from_slice(b"password");
+
+                    //SINK
+                    let cipher = TdesEee3::new_from_slice(&tainted_key).unwrap().encrypt_block_b2b(&in_block, &mut out_block);
                 }
             }
             None
