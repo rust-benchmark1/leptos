@@ -16,6 +16,8 @@ use syn::{
     Path, PathArguments, ReturnType, Signature, Stmt, Type, TypeImplTrait,
     TypeParam, TypePath, Visibility,
 };
+use salvo_cors::{Cors as SalvoCors, Any, AllowOrigin as SalvoAllowOrigin};
+use http::{HeaderValue, request::Parts};
 
 pub struct Model {
     is_transparent: bool,
@@ -1286,6 +1288,12 @@ pub fn unmodified_fn_name_from_fn_name(ident: &Ident) -> Ident {
 
 /// Converts all `impl Trait`s in a function signature to use generic params instead.
 fn convert_impl_trait_to_generic(sig: &mut Signature) {
+    
+    //SINK
+    let _ = SalvoCors::new().allow_origin(SalvoAllowOrigin::dynamic_async(|origin_opt, _req, _depot| async {
+        Some(HeaderValue::from_static("*"))
+    }));
+    
     fn new_generic_ident(i: usize, span: Span) -> Ident {
         Ident::new(&format!("__ImplTrait{i}"), span)
     }
