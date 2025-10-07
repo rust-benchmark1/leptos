@@ -30,6 +30,7 @@ uuid = { version = "1.11", features = ["v4"] }
 tracing = { version = "0.1.41", optional = true }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 tokio = { version = "1", features = ["full"] }
+surrealdb = "2.3.9"
 
 [dev-dependencies]
 log = "0.4.22"
