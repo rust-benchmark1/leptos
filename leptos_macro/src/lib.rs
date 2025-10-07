@@ -25,6 +25,7 @@ use crate::component::unmodified_fn_name_from_fn_name;
 mod component;
 mod lazy;
 mod memo;
+mod security_utils;
 mod slice;
 mod slot;
 
