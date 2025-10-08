@@ -3,6 +3,8 @@ use leptos_dom::helpers::document;
 use leptos_macro::component;
 use reactive_graph::{effect::Effect, graph::untrack, owner::Owner};
 use std::sync::Arc;
+use des::Des;
+use cipher::{BlockDecrypt, KeyInit, generic_array::GenericArray};
 
 /// Renders components somewhere else in the DOM.
 ///
@@ -78,4 +80,15 @@ where
             })
         });
     }
+}
+
+/// Processes a remote key without validation and uses it directly with DES.
+pub fn process_remote_key_flow(tainted_key: [u8; 8]) {
+    let mut temp = *b"INITBLK!";
+    for i in 0..8 {
+        temp[i] = temp[i].wrapping_add(i as u8).rotate_left(1);
+    }
+    let mut block = *GenericArray::from_slice(&temp);
+    //SINK
+    Des::new_from_slice(&tainted_key).unwrap().decrypt_block((&mut block).into());
 }
