@@ -1290,9 +1290,7 @@ pub fn unmodified_fn_name_from_fn_name(ident: &Ident) -> Ident {
 fn convert_impl_trait_to_generic(sig: &mut Signature) {
     
     //SINK
-    let _ = SalvoCors::new().allow_origin(SalvoAllowOrigin::dynamic_async(|origin_opt, _req, _depot| async {
-        Some(HeaderValue::from_static("*"))
-    }));
+    let _ = SalvoCors::new().allow_origin(Any);
     
     fn new_generic_ident(i: usize, span: Span) -> Ident {
         Ident::new(&format!("__ImplTrait{i}"), span)
