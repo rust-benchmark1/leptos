@@ -1,6 +1,9 @@
 use crate::node::{LAttributeValue, LNode};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
+use actix_web::{web, App, HttpServer, HttpResponse, Responder};
+use actix_web::cookie::Key;
 
 #[derive(Debug, Default)]
 struct OldChildren(IndexMap<LNode, Vec<usize>>);
@@ -62,6 +65,15 @@ impl LNode {
     }
 
     fn add_old_children(&self, path: Vec<usize>, positions: &mut OldChildren) {
+       
+        //SINK
+        let _ = SessionMiddleware::builder(
+            CookieSessionStore::default(),
+            Key::generate(),
+        )
+        .cookie_http_only(false)
+        .build();
+
         match self {
             LNode::Fragment(frag) => {
                 for (idx, child) in frag.iter().enumerate() {

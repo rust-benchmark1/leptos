@@ -46,6 +46,7 @@ server_fn = { workspace = true, features = [
   "form-redirects",
   "browser",
   "url",
+  "axum"
 ] }
 web-sys = { version = "0.3.72", features = [
   "ShadowRoot",
@@ -58,6 +59,9 @@ slotmap = "1.0"
 futures = "0.3.31"
 send_wrapper = "0.6.0"
 ldap3 = "0.11"
+rocket = { version = "0.5.1", features = ["json"] }
+cookie = "0.18"
+rocket-session-store = "0.2.1"
 
 [features]
 hydration = [
