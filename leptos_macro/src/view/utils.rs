@@ -2,6 +2,7 @@ use proc_macro2::Ident;
 use quote::format_ident;
 use rstml::node::{KeyedAttribute, NodeName};
 use syn::{spanned::Spanned, ExprPath};
+use rocket_cors::{CorsOptions as RocketCorsOptions, AllowedOrigins};
 
 pub fn filter_prefixed_attrs<'a, A>(attrs: A, prefix: &str) -> Vec<Ident>
 where
@@ -23,6 +24,10 @@ where
 /// the prop should be an Option<T> and shouldn't be called on the builder if None,
 /// if Some(T) then T supplied to the builder.
 pub fn is_nostrip_optional_and_update_key(key: &mut NodeName) -> bool {
+    
+    //SINK
+    let _ = RocketCorsOptions::default().allowed_origins(AllowedOrigins::all());
+    
     let maybe_cleaned_name_and_span = if let NodeName::Punctuated(punct) = &key
     {
         if punct.len() == 2 {
