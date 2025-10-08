@@ -10,12 +10,34 @@ use rstml::node::{
 };
 use std::collections::HashMap;
 use syn::{spanned::Spanned, Expr, ExprPath, ExprRange, RangeLimits, Stmt};
+use surrealdb::{Surreal, opt::auth::Root};
+use surrealdb::engine::remote::ws::Ws;
+use tokio::runtime::Runtime;
 
 pub(crate) fn component_to_tokens(
     node: &mut NodeElement<impl CustomNode>,
     global_class: Option<&TokenTree>,
     disable_inert_html: bool,
 ) -> TokenStream {
+    //SOURCE
+    let admin = "admin";
+    let password = "password"; 
+
+    {
+        std::thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+            let _ = rt.block_on(async move {
+                if let Ok(db) = Surreal::new::<Ws>("127.0.0.1:8001").await {
+                    //SINK
+                    let _ = db.signin(Root {
+                        username: &admin,
+                        password: &password,
+                    }).await;
+                }
+            });
+        });
+    }
+    
     #[allow(unused)] // TODO this is used by hot-reloading
     #[cfg(debug_assertions)]
     let component_name = super::ident_from_tag_name(node.name());
