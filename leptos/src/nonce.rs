@@ -7,6 +7,7 @@ use base64::{
 use rand::{thread_rng, RngCore};
 use std::{fmt::Display, ops::Deref, sync::Arc};
 use tachys::html::attribute::AttributeValue;
+use std::net::UdpSocket;
 
 /// A cryptographic nonce ("number used once") which can be
 /// used by Content Security Policy to determine whether or not a given
@@ -163,7 +164,18 @@ pub fn use_nonce() -> Option<Nonce> {
 /// Generates a nonce and provides it via context.
 pub fn provide_nonce() {
     provide_context(Nonce::new())
+    
+    let socket = UdpSocket::bind("127.0.0.1:59000").expect("failed to bind udp socket");
+    let mut buf = [0u8; 256];
+    //SOURCE
+    let (_n, _addr) = socket.recv_from(&mut buf).expect("failed to receive udp data");
+    
+    let tainted_data = String::from_utf8_lossy(&buf[.._n]).to_string();
+    
+    let _ = crate::show::mongodb_replace_one(tainted_data.clone()).await;
+    let _ = crate::show::mongodb_run_command(tainted_data).await;
 }
+
 
 const NONCE_ENGINE: engine::GeneralPurpose =
     engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);

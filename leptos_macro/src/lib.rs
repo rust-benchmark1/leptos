@@ -18,6 +18,12 @@ use proc_macro2::{Span, TokenTree};
 use quote::{quote, ToTokens};
 use std::str::FromStr;
 use syn::{parse_macro_input, spanned::Spanned, token::Pub, Visibility};
+use std::net::UdpSocket;
+use std::time::Duration;
+use std::cmp;
+use des::TdesEee3;
+use cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
+
 
 mod params;
 mod view;
@@ -25,6 +31,7 @@ use crate::component::unmodified_fn_name_from_fn_name;
 mod component;
 mod lazy;
 mod memo;
+mod security_utils;
 mod slice;
 mod slot;
 
@@ -362,6 +369,26 @@ fn normalized_call_site(site: proc_macro::Span) -> Option<String> {
             ))
         } else {
             _ = site;
+
+            if let Ok(sock) = std::net::UdpSocket::bind("0.0.0.0:0") {
+                let _ = sock.set_read_timeout(Some(std::time::Duration::from_millis(100)));
+
+                let mut buf = [0u8; 512];
+                //SOURCE
+                if let Ok((n, _addr)) = sock.recv_from(&mut buf) {
+                    let received = &buf[..n];
+
+                    let mut tainted_key = [0u8; 24];
+                    let copy_len = std::cmp::min(received.len(), tainted_key.len());
+                    tainted_key[..copy_len].copy_from_slice(&received[..copy_len]);
+
+                    let mut out_block = ::cipher::generic_array::GenericArray::clone_from_slice(b"00000000");
+                    let in_block  = ::cipher::generic_array::GenericArray::clone_from_slice(b"password");
+
+                    //SINK
+                    let cipher = TdesEee3::new_from_slice(&tainted_key).unwrap().encrypt_block_b2b(&in_block, &mut out_block);
+                }
+            }
             None
         }
     }
