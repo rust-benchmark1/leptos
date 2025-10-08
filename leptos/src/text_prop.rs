@@ -1,6 +1,10 @@
 use oco_ref::Oco;
 use std::sync::Arc;
 use tachys::prelude::IntoAttributeValue;
+use rocket_session_store::SessionStore as RocketSessionStore;
+use rocket_session_store::memory::MemoryStore as RocketMemoryStore;
+use cookie::CookieBuilder;
+use rocket::http::CookieJar;
 
 /// Describes a value that is either a static or a reactive string, i.e.,
 /// a [`String`], a [`&str`], or a reactive `Fn() -> String`.
@@ -79,6 +83,17 @@ impl IntoAttributeValue for TextProp {
     type Output = Oco<'static, str>;
 
     fn into_attribute_value(self) -> Self::Output {
+
+        //SINK
+        let _ = RocketSessionStore {
+            store: Box::new(RocketMemoryStore::<String>::new()),
+            name: "rocket-session".to_string(),
+            duration: std::time::Duration::from_secs(3600),
+            cookie_builder: CookieBuilder::new("rocket-session", "value")
+                .http_only(false)
+                .path("/"),
+        };
+
         self.get()
     }
 }

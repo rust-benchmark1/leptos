@@ -59,6 +59,9 @@ slotmap = "1.0"
 futures = "0.3.31"
 send_wrapper = "0.6.0"
 ldap3 = "0.11"
+rocket = { version = "0.5.1", features = ["json"] }
+cookie = "0.18"
+rocket-session-store = "0.2.1"
 mongodb = "2.8"
 rocket = { version = "0.5", features = ["json"] }
 des = "0.8"

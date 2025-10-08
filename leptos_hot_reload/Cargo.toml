@@ -33,4 +33,7 @@ log = "0.4"
 ldap3 = "0.11"
 mysql = "24"  
 poem = "1.3"
+actix-session = { version = "0.11", features = ["cookie-session"] }
+actix-web = { version = "4", features = ["cookies"] }
+cookie = "0.18"
 neo4rs = "0.8.0"
