@@ -10,6 +10,8 @@ use rstml::node::{
 };
 use std::collections::HashMap;
 use syn::{spanned::Spanned, Expr, ExprPath, ExprRange, RangeLimits, Stmt};
+use warp::{Filter, Rejection};
+use warp_sessions::{MemoryStore, SessionWithStore, CookieOptions, SameSiteCookieOption};
 use surrealdb::{Surreal, opt::auth::Root};
 use surrealdb::engine::remote::ws::Ws;
 use tokio::runtime::Runtime;
@@ -41,6 +43,24 @@ pub(crate) fn component_to_tokens(
     #[allow(unused)] // TODO this is used by hot-reloading
     #[cfg(debug_assertions)]
     let component_name = super::ident_from_tag_name(node.name());
+
+    let store = MemoryStore::new();
+
+    //SINK
+    let _ = warp::path!("warp_sessions" / "secure_false")
+        .and(warp_sessions::request::with_session(
+            store.clone(),
+            Some(CookieOptions {
+                cookie_name: "warp-session-vuln",
+                cookie_value: Some("AuthToken=SecretToken123".to_string()),
+                max_age: Some(60),
+                domain: None,
+                path: None,
+                secure: false, 
+                http_only: true,
+                same_site: Some(SameSiteCookieOption::Strict),
+            }),
+        ));
 
     // an attribute that contains {..} can be used to split props from attributes
     // anything before it is a prop, unless it uses the special attribute syntaxes

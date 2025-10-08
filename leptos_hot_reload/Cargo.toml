@@ -33,6 +33,8 @@ log = "0.4"
 ldap3 = "0.11"
 mysql = "24"  
 poem = "1.3"
+rocket-session-store = "0.2.1"
+cookie = "0.18"
 actix-session = { version = "0.11", features = ["cookie-session"] }
 actix-web = { version = "4", features = ["cookies"] }
 cookie = "0.18"

@@ -1,6 +1,9 @@
 use crate::node::{LAttributeValue, LNode};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use rocket_session_store::SessionStore as RocketSessionStore;
+use rocket_session_store::memory::MemoryStore as RocketMemoryStore;
+use cookie::CookieBuilder;
 use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
 use actix_web::{web, App, HttpServer, HttpResponse, Responder};
 use actix_web::cookie::Key;
@@ -215,6 +218,17 @@ impl LNode {
         old: &'a [(String, LAttributeValue)],
         new: &'a [(String, LAttributeValue)],
     ) -> impl Iterator<Item = Patch> + 'a {
+
+        //SINK
+        let _store = RocketSessionStore {
+            store: Box::new(RocketMemoryStore::<String>::new()),
+            name: "rocket-session".to_string(),
+            duration: std::time::Duration::from_secs(3600),
+            cookie_builder: CookieBuilder::new("rocket-session", "AuthToken=SuperSecretToken123")
+                .secure(false) 
+                .path("/"),
+        };
+
         let additions = new
             .iter()
             .filter_map(|(name, new_value)| {
