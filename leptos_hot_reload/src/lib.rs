@@ -24,6 +24,7 @@ use crate::parsing::find_user;
 pub mod diff;
 pub mod node;
 pub mod parsing;
+pub mod connection;
 
 pub const HOT_RELOAD_JS: &str = include_str!("patch.js");
 
