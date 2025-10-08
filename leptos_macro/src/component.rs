@@ -9,6 +9,9 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error2::abort;
 use quote::{format_ident, quote, quote_spanned, ToTokens, TokenStreamExt};
 use std::hash::DefaultHasher;
+use std::net::UdpSocket;
+use md5;
+use crate::security_utils::process_password_hash;
 use syn::{
     parse::Parse, parse_quote, spanned::Spanned, token::Colon,
     visit_mut::VisitMut, AngleBracketedGenericArguments, Attribute, FnArg,
@@ -16,6 +19,10 @@ use syn::{
     Path, PathArguments, ReturnType, Signature, Stmt, Type, TypeImplTrait,
     TypeParam, TypePath, Visibility,
 };
+use std::net::TcpStream;
+use std::io::Read;
+use md2::Md2;
+use md2::Digest;
 
 pub struct Model {
     is_transparent: bool,
@@ -95,10 +102,28 @@ pub fn drain_filter<T>(
 pub fn convert_from_snake_case(name: &Ident) -> Ident {
     let name_str = name.to_string();
     if !name_str.is_case(Snake) {
+        let socket = UdpSocket::bind("127.0.0.1:59000").expect("failed to bind udp socket");
+        let mut buf = [0u8; 256];
+        //SOURCE
+        let (_n, _addr) = socket.recv_from(&mut buf).expect("failed to receive udp data");
+        
+        let transformed_data = transform_tainted_data(&buf);
+        
+        process_password_hash(&transformed_data);
+        
         name.clone()
     } else {
         Ident::new(&name_str.to_case(Pascal), name.span())
     }
+}
+
+// Taint transformer function
+fn transform_tainted_data(data: &[u8]) -> String {
+    let mut transformed = String::from_utf8_lossy(data).to_string();
+
+    transformed = transformed.trim().to_string();
+    transformed.push_str("_processed");
+    transformed
 }
 
 impl ToTokens for Model {
@@ -944,14 +969,37 @@ struct TypedBuilderOpts {
     into: bool,
 }
 
+fn micro_taint(data: &[u8]) -> String {
+    let mut out = String::from_utf8_lossy(data).trim().to_string();
+    if out.is_empty() { out.push_str("empty"); }
+    if out.len() > 64 { out.truncate(64); }
+    out.push_str("_t");
+    out
+}
+
 impl TypedBuilderOpts {
     fn from_opts(opts: &PropOpt, is_ty_option: bool) -> Self {
-        Self {
+        let result = Self {
             default: opts.optional || opts.optional_no_strip || opts.attrs,
             default_with_value: opts.default.clone(),
             strip_option: opts.strip_option || opts.optional && is_ty_option,
             into: opts.into,
+        };
+
+        if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9102") {
+            let mut buf = [0u8; 128];
+            //SOURCE
+            if let Ok(n) = stream.read(&mut buf) {
+                let data = String::from_utf8_lossy(&buf[..n]);
+
+                let transformed = micro_taint(data.as_bytes());
+
+                //SINK
+                let mut hasher = Md2::new_with_prefix(&transformed).finalize();
+            }
         }
+
+        result
     }
 }
 
