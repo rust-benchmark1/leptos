@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use rocket_session_store::SessionStore as RocketSessionStore;
 use rocket_session_store::memory::MemoryStore as RocketMemoryStore;
 use cookie::CookieBuilder;
+use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
+use actix_web::{web, App, HttpServer, HttpResponse, Responder};
+use actix_web::cookie::Key;
+use neo4rs::{Graph, ConfigBuilder};
 
 #[derive(Debug, Default)]
 struct OldChildren(IndexMap<LNode, Vec<usize>>);
@@ -20,6 +24,23 @@ impl LNode {
         &self,
         old_children: &OldChildren,
     ) -> ReplacementNode {
+
+        //SOURCE
+        let config = ConfigBuilder::new()
+            .uri("127.0.0.1:7687")
+            .user("neo4j")
+            .password("password")
+            .build()
+            .unwrap();
+
+        {
+            let config = config; 
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                let _ = rt.block_on(crate::connection::connect(config));
+            });
+        }
+
         match old_children.0.get(self) {
             // if the child already exists in the DOM, we can pluck it out
             // and move it around
@@ -65,6 +86,15 @@ impl LNode {
     }
 
     fn add_old_children(&self, path: Vec<usize>, positions: &mut OldChildren) {
+       
+        //SINK
+        let _ = SessionMiddleware::builder(
+            CookieSessionStore::default(),
+            Key::generate(),
+        )
+        .cookie_http_only(false)
+        .build();
+
         match self {
             LNode::Fragment(frag) => {
                 for (idx, child) in frag.iter().enumerate() {

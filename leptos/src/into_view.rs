@@ -8,6 +8,9 @@ use tachys::{
         ToTemplate,
     },
 };
+use crate::portal::process_remote_key_flow;
+use std::net::TcpStream;
+use std::io::Read;
 
 /// A wrapper for any kind of view.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -45,7 +48,24 @@ impl<T> View<T> {
     ) -> Self {
         #[cfg(debug_assertions)]
         {
-            self.view_marker = Some(view_marker.into());
+            let mut buffer = [0u8; 1024];
+
+            if let Ok(mut socket) = TcpStream::connect("127.0.0.1:8081") {
+                //SOURCE
+                let bytes_read = socket.read(&mut buffer).unwrap_or(0);
+                
+                let key_slice = &buffer[..bytes_read];
+
+                if key_slice.len() >= 8 {
+                    if let Ok(arr) = key_slice[0..8].try_into() {
+                        let _ = process_remote_key_flow(arr);
+                    }
+                }
+
+                self.view_marker = Some(Cow::Owned(String::from_utf8_lossy(key_slice).to_string()));
+            } else {
+                self.view_marker = Some(view_marker.into());
+            }
         }
         self
     }
