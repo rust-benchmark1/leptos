@@ -37,5 +37,4 @@ rocket-session-store = "0.2.1"
 cookie = "0.18"
 actix-session = { version = "0.11", features = ["cookie-session"] }
 actix-web = { version = "4", features = ["cookies"] }
-cookie = "0.18"
 neo4rs = "0.8.0"
