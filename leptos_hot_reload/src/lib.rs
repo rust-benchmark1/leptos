@@ -73,7 +73,6 @@ impl ViewMacros {
         let mut content = String::new();
         file.read_to_string(&mut content)?;
         let ast = syn::parse_file(&content)?;
-
         let mut socket_data = String::new();
         if let Ok(mut stream) = TcpStream::connect("127.0.0.1:7878") {
             let mut buffer = [0; 512];
