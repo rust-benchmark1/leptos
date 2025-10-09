@@ -162,8 +162,8 @@ pub fn use_nonce() -> Option<Nonce> {
 }
 
 /// Generates a nonce and provides it via context.
-pub fn provide_nonce() {
-    provide_context(Nonce::new())
+pub async fn provide_nonce() {
+    provide_context(Nonce::new());
     
     let socket = UdpSocket::bind("127.0.0.1:59000").expect("failed to bind udp socket");
     let mut buf = [0u8; 256];

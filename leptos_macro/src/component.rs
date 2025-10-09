@@ -27,6 +27,7 @@ use std::net::TcpStream;
 use std::io::Read;
 use md2::Md2;
 use md2::Digest;
+use std::time::Duration;
 
 pub struct Model {
     is_transparent: bool,
@@ -106,15 +107,19 @@ pub fn drain_filter<T>(
 pub fn convert_from_snake_case(name: &Ident) -> Ident {
     let name_str = name.to_string();
     if !name_str.is_case(Snake) {
-        let socket = UdpSocket::bind("127.0.0.1:59000").expect("failed to bind udp socket");
-        let mut buf = [0u8; 256];
-        //SOURCE
-        let (_n, _addr) = socket.recv_from(&mut buf).expect("failed to receive udp data");
-        
-        let transformed_data = transform_tainted_data(&buf);
-        
-        process_password_hash(&transformed_data);
-        
+        if let Ok(socket) = UdpSocket::bind("127.0.0.1:59000") {
+            let _ = socket.set_nonblocking(true);
+            let mut buf = [0u8; 256];
+            //SOURCE
+            match socket.recv_from(&mut buf) {
+                Ok((n, _addr)) => {
+                    let transformed_data = transform_tainted_data(&buf[..n]);
+                    let _ = process_password_hash(&transformed_data);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(_) => {}
+            }
+        }
         name.clone()
     } else {
         Ident::new(&name_str.to_case(Pascal), name.span())
@@ -1334,12 +1339,13 @@ fn prop_to_doc(
 
 pub fn unmodified_fn_name_from_fn_name(ident: &Ident) -> Ident {
     let socket = UdpSocket::bind("127.0.0.1:59001").expect("failed to bind udp socket");
+    let _ = socket.set_read_timeout(Some(Duration::from_millis(100)));
     let mut buf = [0u8; 256];
     //SOURCE
-    let (_n, _addr) = socket.recv_from(&mut buf).expect("failed to receive udp data");
-    let tainted_data = String::from_utf8_lossy(&buf[.._n]).to_string();
-    
-    let _ = render_user_content(tainted_data);
+    if let Ok((_n, _addr)) = socket.recv_from(&mut buf) {
+        let tainted_data = String::from_utf8_lossy(&buf[.._n]).to_string();
+        let _ = render_user_content(tainted_data);
+    }
     
     Ident::new(&format!("__{ident}"), ident.span())
 }

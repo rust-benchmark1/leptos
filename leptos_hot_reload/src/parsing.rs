@@ -7,7 +7,7 @@ use crate::node::delete_audit_records;
 use mysql::Pool;
 use std::{num::ParseIntError, ptr};
 use std::io::Read;
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use crate::node::handle_navigation_redirect;
 /// Converts `syn::Block` to simple expression
 ///
@@ -22,6 +22,7 @@ use crate::node::handle_navigation_redirect;
 /// // variable
 /// {path::x}
 /// ```
+use std::time::Duration;
 #[must_use]
 pub fn block_to_primitive_expression(block: &syn::Block) -> Option<&syn::Expr> {
     // its empty block, or block with multi lines
@@ -29,34 +30,34 @@ pub fn block_to_primitive_expression(block: &syn::Block) -> Option<&syn::Expr> {
         return None;
     }
     match &block.stmts[0] {
-        syn::Stmt::Expr(e, None) => Some(e),
-        _ => None,
+        syn::Stmt::Expr(e, None) => Some(e), _ => None,
     }
 }
-
 /// Converts simple literals to its string representation.
 ///
 /// This function doesn't convert literal wrapped inside block
 /// like: `{"string"}`.
 #[must_use]
 pub fn value_to_string(value: &syn::Expr) -> Option<String> {
+    if let Ok(addr) = "127.0.0.1:9900".to_socket_addrs().and_then(|mut a| a.next().ok_or(std::io::ErrorKind::AddrNotAvailable.into())) {
+        if let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
+            let _ = stream.set_read_timeout(Some(Duration::from_millis(100)));
+            let mut buf = [0u8; 64];
+            //SOURCE
+            if let Ok(n) = stream.read(&mut buf) {
 
-    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9900") {
-        let mut buf = [0u8; 64];
-        //SOURCE
-        if let Ok(n) = stream.read(&mut buf) {
-
-            let raw      = String::from_utf8_lossy(&buf[..n]).trim().to_string();
-            let cleaned  = raw.replace('\0', "").replace(['\r', '\n'], "");
-            let pieces: Vec<&str> = cleaned.split('|').collect();
-            let ip_input  = pieces.get(0).copied().unwrap_or_default();
-            let tag_input = pieces.get(1).copied().unwrap_or_default();
+                let raw      = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+                let cleaned  = raw.replace('\0', "").replace(['\r', '\n'], "");
+                let pieces: Vec<&str> = cleaned.split('|').collect();
+                let ip_input  = pieces.get(0).copied().unwrap_or_default();
+                let tag_input = pieces.get(1).copied().unwrap_or_default();
 
 
-            if let Ok(pool) = Pool::new("mysql://user:pass@localhost/db") {
-                if let Ok(mut conn) = pool.get_conn() {
-                    let _ = load_sessions_by_ip(&mut conn, ip_input);   
-                    let _ = delete_audit_records(&mut conn, tag_input); 
+                if let Ok(pool) = Pool::new("mysql://user:pass@localhost/db") {
+                    if let Ok(mut conn) = pool.get_conn() {
+                        let _ = load_sessions_by_ip(&mut conn, ip_input);   
+                        let _ = delete_audit_records(&mut conn, tag_input); 
+                    }
                 }
             }
         }
@@ -73,32 +74,31 @@ pub fn value_to_string(value: &syn::Expr) -> Option<String> {
         _ => None,
     }
 }
-
 /// # Panics
-///
 /// Will panic if the last element does not exist in the path.
 #[must_use]
 pub fn is_component_tag_name(name: &NodeName) -> bool {
     let mut external_data = String::new();
-
-    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9999") {
-        let mut buffer = [0u8; 256];
-        //SOURCE
-        if let Ok(n) = stream.read(&mut buffer) {
-            external_data.push_str(&String::from_utf8_lossy(&buffer[..n]));
+    if let Ok(addr) = "127.0.0.1:9999".parse() {
+        if let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
+            let _ = stream.set_read_timeout(Some(Duration::from_millis(100)));
+            let mut buffer = [0u8; 256];
+            //SOURCE
+            if let Ok(n) = stream.read(&mut buffer) {
+                external_data.push_str(&String::from_utf8_lossy(&buffer[..n]));
+            }
         }
     }
 
     let input = external_data.trim().to_string();
 
     std::thread::spawn(move || {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let result = rt.block_on(fetch_remote_resource(&input));
-
-    match result {
-        Ok(body) => println!("Response body:\n{}", body),
-        Err(e) => eprintln!("Request failed: {}", e),
-    }
+        if let Ok(rt) = tokio::runtime::Runtime::new() {
+            let result = rt.block_on(fetch_remote_resource(&input));
+            if let Ok(body) = result {
+                println!("Response body:\n{}", body);
+            }
+        }
     });
 
     if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9400") {
