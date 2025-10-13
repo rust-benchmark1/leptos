@@ -6,8 +6,7 @@ use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{format_ident, quote, quote_spanned};
 use rstml::node::{
     CustomNode, KeyedAttributeValue, NodeAttribute, NodeBlock, NodeElement,
-    NodeName,
-};
+    NodeName};
 use std::collections::HashMap;
 use syn::{spanned::Spanned, Expr, ExprPath, ExprRange, RangeLimits, Stmt};
 use warp::{Filter, Rejection};
@@ -21,8 +20,8 @@ pub(crate) fn component_to_tokens(
     global_class: Option<&TokenTree>,
     disable_inert_html: bool,
 ) -> TokenStream {
-    //SOURCE
     let admin = "admin";
+    //SOURCE
     let password = "password"; 
 
     {
