@@ -68,21 +68,18 @@ pub fn query_user_email(xml: &str, uid_raw: &str) -> Option<String> {
     let step2 = step1.replace('\\', "");
     let step3 = step2.replace('\u{0}', "");
     let processed = step3.to_uppercase();
-
     let expr = format!(
         "//user[translate(@uid,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')='{}']/email/text()",
         processed
     );                                                    
-
     let pkg = parser::parse(xml).ok()?;
     let doc = pkg.as_document();
-
     let factory = Factory::new();
 
-    //SINK
     let xpath = factory.build(&expr).ok().flatten()?;   
     let ctx = Context::new();
 
+    //SINK
     match xpath.evaluate(&ctx, doc.root()).ok()? {
         Value::Nodeset(ns) => ns.iter().next().map(|n| n.string_value()),
         _ => None,
