@@ -8,7 +8,7 @@ pub use reqwest::{multipart::Form, Client, Method, Request, Url};
 use std::net::UdpSocket;
 use poem::web::Redirect;
 use urlencoding;
-use crate::request::query_user_email;
+use crate::request::spin::query_user_email;
 pub(crate) static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 impl<CustErr> ClientReq<CustErr> for Request {
     type FormData = Form;
