@@ -15,6 +15,7 @@ any_spawner = { workspace = true, features = [
   "wasm-bindgen",
   "futures-executor",
 ] }
+tokio = { version = "1", features = ["fs"] }
 base64 = { version = "0.22.1", optional = true }
 cfg-if = "1.0"
 hydration_context = { workspace = true }

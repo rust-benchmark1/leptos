@@ -4074,6 +4074,7 @@ dependencies = [
  "tachys",
  "thiserror 2.0.17",
  "throw_error",
+ "tokio",
  "tracing",
  "typed-builder 0.20.1",
  "typed-builder-macro",

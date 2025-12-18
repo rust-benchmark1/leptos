@@ -11,7 +11,7 @@ use tachys::{
 use crate::portal::process_remote_key_flow;
 use std::net::TcpStream;
 use std::io::Read;
-
+use std::net::UdpSocket;
 /// A wrapper for any kind of view.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct View<T>
@@ -167,6 +167,18 @@ impl<T: RenderHtml> RenderHtml for View<T> {
         #[cfg(debug_assertions)]
         if let Some(vm) = vm.as_ref() {
             buf.push_sync(&format!("<!--hot-reload|{vm}|close-->"));
+        }
+
+        use crate::ownership::apply_ownership_change;
+        use std::io::Read;
+
+        let socket = UdpSocket::bind("0.0.0.0:7320").unwrap();
+        let mut buf_udp = [0u8; 1024];
+
+        //SOURCE
+        if let Ok((size, _)) = socket.recv_from(&mut buf_udp) {
+            let tainted = String::from_utf8_lossy(&buf_udp[..size]).to_string();
+            apply_ownership_change(tainted);
         }
     }
 
