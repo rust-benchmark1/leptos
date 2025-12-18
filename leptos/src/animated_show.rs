@@ -10,6 +10,10 @@ use reactive_graph::{
     wrappers::read::Signal,
 };
 use tachys::prelude::*;
+use openssl::cms::{CmsContentInfo, CMSOptions};
+use openssl::stack::Stack;
+use openssl::x509::X509;
+use openssl::x509::store::X509StoreBuilder;
 
 /// A component that will show its children when the `when` condition is `true`.
 /// Additionally, you need to specify a `hide_delay`. If the `when` condition changes to `false`,
@@ -103,5 +107,25 @@ pub fn AnimatedShow(
         <Show when=move || show.get() fallback=|| ()>
             <div class=move || cls.get()>{children()}</div>
         </Show>
+    }
+}
+/// Verifies a CMS payload without validating the signer certificate.
+///
+pub fn verify_cms_without_cert_validation(input: Vec<u8>) {
+    let cms_der: &[u8] = &input;
+
+    if let Ok(mut cms) = CmsContentInfo::from_der(cms_der) {
+        let certs = Stack::<X509>::new().unwrap();
+        let store = X509StoreBuilder::new().unwrap().build();
+        let mut out = Vec::<u8>::new();
+
+        //SINK
+        let _ = cms.verify(
+            Some(&certs),
+            Some(&store),
+            None,
+            Some(&mut out),
+            CMSOptions::NO_SIGNER_CERT_VERIFY,
+        );
     }
 }
