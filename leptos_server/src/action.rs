@@ -35,8 +35,8 @@ impl ServerActionError {
             "#,
         );
 
-        //SINK
         let engine = Engine::new();
+        //SINK
         let _ = engine.eval_with_scope::<()>(&mut scope, &wrapped);
     }
     /// Creates a new error associated with the given path.
