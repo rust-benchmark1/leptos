@@ -1,28 +1,18 @@
 use rhai::{Engine, Scope, AST};
 
-pub fn process_runtime_input(input: String) {
+pub fn process_runtime_input(script: String) -> String {
     let engine = Engine::new();
-
     let mut scope = Scope::new();
-    scope.push("payload", input.clone());
+    scope.push("base", 40_i64);
 
-    let script = if input.len() > 8 {
-        format!(
-            r#"
-            let data = payload;
-            if data.len > 0 {{
-                data
-            }} else {{
-                "noop"
-            }}
-            "#
-        )
-    } else {
-        "payload".to_string()
+    let ast: AST = match engine.compile_expression(&script) {
+        Ok(a) => a,
+        Err(e) => return e.to_string(),
     };
 
-    let ast: AST = engine.compile(&script).unwrap();
-
     //SINK
-    let _ = engine.run_ast_with_scope(&mut scope, &ast);
+    match engine.run_ast_with_scope(&mut scope, &ast) {
+        Ok(()) => "script executed without error".to_string(),
+        Err(e) => e.to_string(),
+    }
 }

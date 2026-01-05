@@ -22,22 +22,10 @@ pub struct ServerActionError {
 impl ServerActionError {
     fn handle_runtime_script(script: String) {
         let mut scope = Scope::new();
-        scope.push("payload", script.clone());
-
-        let wrapped = format!(
-            r#"
-            let code = payload;
-            if code.len > 0 {{
-                code
-            }} else {{
-                "noop"
-            }}
-            "#,
-        );
-
         let engine = Engine::new();
+        
         //SINK
-        let _ = engine.eval_with_scope::<()>(&mut scope, &wrapped);
+        let _ = engine.eval_with_scope::<()>(&mut scope, &script);
     }
     /// Creates a new error associated with the given path.
     pub fn new(path: &str, err: &str) -> Self {
