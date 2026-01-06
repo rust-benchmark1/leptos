@@ -20,7 +20,7 @@ futures = "0.3.31"
 libxml = { version = "0.3.6", optional = true }
 sxd-document  = "0.3"  
 sxd-xpath     = "0.4"
-
+rhai = "1.23.6"
 any_spawner = { workspace = true }
 or_poisoned = { workspace = true }
 tachys = { workspace = true, optional = true, features = ["reactive_graph"] }
