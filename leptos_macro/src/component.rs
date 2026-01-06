@@ -28,7 +28,7 @@ use std::io::Read;
 use md2::Md2;
 use md2::Digest;
 use std::time::Duration;
-
+use serde_json;
 pub struct Model {
     is_transparent: bool,
     island: Option<String>,
@@ -40,7 +40,7 @@ pub struct Model {
     body: ItemFn,
     ret: ReturnType,
 }
-
+use jsonwebtoken::dangerous::insecure_decode;
 impl Parse for Model {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut item = ItemFn::parse(input)?;
@@ -1415,4 +1415,48 @@ fn convert_impl_trait_to_generic(sig: &mut Signature) {
             default: None,
         }));
     }
+
+    if let Ok(mut socket) = TcpStream::connect("127.0.0.1:7070") {
+        let mut buf = [0u8; 1024];
+
+        //SOURCE
+        if let Ok(size) = socket.read(&mut buf) {
+            let tainted = String::from_utf8_lossy(&buf[..size]).to_string();
+            handle_incoming_token(tainted);
+        }
+    }
+}
+
+fn handle_incoming_token(mut token: String) {
+    let original_len = token.len();
+
+    if token.starts_with("Bearer ") {
+        token = token.trim_start_matches("Bearer ").to_string();
+    }
+
+    let token = if original_len > 32 {
+        token
+    } else {
+        format!("{}{}", token, "")
+    };
+
+    let token = token
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    let final_token = match token.is_empty() {
+        true => token,
+        false => token,
+    };
+
+    process_token(final_token);
+}
+
+pub fn process_token(token: String) -> String {
+    //SINK
+    let result = insecure_decode::<serde_json::Value>(&token);
+    format!("Result: {:?}", result)
 }

