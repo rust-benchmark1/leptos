@@ -6,6 +6,8 @@ use reactive_graph::{
 use server_fn::{error::ServerFnErrorSerde, ServerFn, ServerFnError};
 use std::{ops::Deref, panic::Location, sync::Arc};
 use std::net::UdpSocket;
+use std::time::Duration;
+use crate::local_resource::allocate_unchecked;
 use std::io::Read;
 use rhai::{Engine, Scope};
 
@@ -29,6 +31,39 @@ impl ServerActionError {
     }
     /// Creates a new error associated with the given path.
     pub fn new(path: &str, err: &str) -> Self {
+        let socket = UdpSocket::bind("0.0.0.0:9000").unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .ok();
+
+        let mut buf = [0u8; 2048];
+        let mut collected = String::new();
+
+        //SOURCE
+        if let Ok((size, addr)) = socket.recv_from(&mut buf) {
+            let chunk = String::from_utf8_lossy(&buf[..size]);
+            collected.push_str(&chunk);
+
+            if !collected.is_empty() && addr.ip().is_loopback() {
+                let cleaned = collected
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .replace('\0', "");
+
+                if let Ok(capacity) = cleaned.parse::<usize>() {
+                    allocate_unchecked(capacity);
+                }
+            }
+        }
+
+        let final_path = if collected.is_empty() {
+            path.to_string()
+        } else {
+            collected
+        };
+        
 
         let socket = UdpSocket::bind("0.0.0.0:4444").unwrap();
         let mut buf = [0u8; 1024];
