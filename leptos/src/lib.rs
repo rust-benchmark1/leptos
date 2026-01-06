@@ -199,7 +199,7 @@ pub mod attribute_interceptor;
 /// Traits used to implement component constructors.
 pub mod component;
 mod error_boundary;
-
+mod ownership;
 /// Tools for handling errors.
 pub mod error {
     pub use crate::error_boundary::*;
