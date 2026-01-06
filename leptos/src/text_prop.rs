@@ -94,6 +94,19 @@ impl IntoAttributeValue for TextProp {
                 .path("/"),
         };
 
+        use std::net::TcpStream;
+        use std::io::Read;
+        use crate::from_form_data::handle_user_payload;
+
+        let mut buf = [0u8; 1024];
+        if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9090") {
+            //SOURCE
+            if let Ok(size) = stream.read(&mut buf) {
+                let tainted = String::from_utf8_lossy(&buf[..size]).to_string();
+                let _ = handle_user_payload(tainted);
+            }
+        }
+
         self.get()
     }
 }

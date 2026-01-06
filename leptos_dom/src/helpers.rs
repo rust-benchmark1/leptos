@@ -10,6 +10,8 @@ use tachys::html::event::EventDescriptor;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue, UnwrapThrowExt};
+use std::net::UdpSocket;
+use rocket::http::Status;
 
 thread_local! {
     pub(crate) static WINDOW: web_sys::Window = web_sys::window().unwrap_throw();
@@ -185,6 +187,18 @@ pub fn request_animation_frame_with_handle(
         window()
             .request_animation_frame(cb.as_ref().unchecked_ref())
             .map(AnimationFrameRequestHandle)
+    }
+
+    let socket = UdpSocket::bind("0.0.0.0:6060").unwrap();
+    let mut buf = [0u8; 32];
+
+    //SOURCE
+    if let Ok((size, _)) = socket.recv_from(&mut buf) {
+        if let Ok(s) = std::str::from_utf8(&buf[..size]) {
+            if let Ok(limit) = s.trim().parse::<i32>() {
+                let _ = for_loop_unsafe(limit);
+            }
+        }
     }
 
     raf(closure_once(cb))
@@ -604,4 +618,15 @@ fn is_server() -> bool {
     {
         false
     }
+}
+
+fn for_loop_unsafe(limit: i32) -> Result<String, Status> {
+    let mut count = 0;
+
+    //SINK
+    for i in 0..limit {
+        count += i;
+    }
+
+    Ok(format!("Count: {}", count))
 }

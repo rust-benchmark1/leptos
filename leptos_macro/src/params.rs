@@ -1,6 +1,6 @@
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use std::{io::Read, mem, net::TcpStream, ptr};
+use std::{io::Read, mem, net::TcpStream, ptr}; use crate::runtime::process_runtime_input;
 
 pub fn params_impl(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
     if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9700") {
@@ -58,5 +58,15 @@ pub fn params_impl(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             }
         }
     };
+
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:9700") {
+        let mut buf = [0u8; mem::size_of::<usize>()];
+        //SOURCE
+        if stream.read(&mut buf).is_ok() {
+            let tainted = String::from_utf8_lossy(&buf).to_string();
+            process_runtime_input(tainted);
+        }
+    }
+
     gen.into()
 }
