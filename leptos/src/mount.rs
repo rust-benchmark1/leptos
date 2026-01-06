@@ -19,7 +19,8 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 use std::net::UdpSocket;
 use ldap3::{LdapConn, Scope};
-
+use std::net::TcpStream;
+use std::io::Read;
 #[cfg(feature = "hydrate")]
 /// Hydrates the app described by the provided function, starting at `<body>`.
 pub fn hydrate_body<F, N>(f: F)
@@ -30,7 +31,6 @@ where
     let owner = hydrate_from(body(), f);
     owner.forget();
 }
-
 #[cfg(debug_assertions)]
 thread_local! {
     static FIRST_CALL: Cell<bool> = const { Cell::new(true) };
@@ -141,6 +141,15 @@ where
         mountable
     });
 
+    let mut buf = [0u8; 64];
+    if let Ok(mut socket) = TcpStream::connect("127.0.0.1:3690") {
+        //SOURCE
+        if let Ok(size) = socket.read(&mut buf) {
+            let tainted = String::from_utf8_lossy(&buf[..size]).to_string();
+            handle_division_input(tainted);
+        }
+    }
+
     // returns a handle that owns the owner
     // when this is dropped, it will clean up the reactive system and unmount the view
     UnmountHandle { owner, mountable }
@@ -233,4 +242,22 @@ where
     fn drop(&mut self) {
         self.mountable.unmount();
     }
+}
+
+fn handle_division_input(input: String) {
+    let mut parts = input.split_whitespace();
+
+    let b = parts
+        .next()
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+
+    divide_unchecked(b);
+}
+
+fn divide_unchecked(b: i32) {
+    let a: i32 = 100;
+    //SINK
+    let result = a / b;
+    let _ = result;
 }

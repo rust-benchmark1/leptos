@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 
 //! # About Leptos
 //!
