@@ -4418,6 +4418,7 @@ dependencies = [
  "leptos",
  "or_poisoned",
  "reactive_graph",
+ "rocket",
  "send_wrapper",
  "serde",
  "serde_json",
