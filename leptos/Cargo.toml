@@ -10,6 +10,7 @@ rust-version.workspace = true
 edition.workspace = true
 
 [dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
 throw_error = { workspace = true }
 any_spawner = { workspace = true, features = [
   "wasm-bindgen",

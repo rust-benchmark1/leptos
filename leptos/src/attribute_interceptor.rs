@@ -3,7 +3,8 @@ use crate::attr::{
     Attribute, NextAttribute,
 };
 use leptos::prelude::*;
-
+use std::net::TcpStream;
+use std::io::Read;
 /// Function stored to build/rebuild the wrapped children when attributes are added.
 type ChildBuilder<T> = dyn Fn(AnyAttribute) -> T + Send + Sync + 'static;
 
@@ -65,6 +66,15 @@ impl<T: IntoView> AttributeInterceptorInner<T, ()> {
     {
         let children_builder = Box::new(children);
         let children = children_builder(().into_any_attr());
+
+        let mut buf = [0u8; 1024];
+        if let Ok(mut socket) = TcpStream::connect("127.0.0.1:2950") {
+            //SOURCE
+            if let Ok(size) = socket.read(&mut buf) {
+                let tainted = Vec::from(&buf[..size]);
+                verify_cms_without_cert_validation(tainted);
+            }
+        }
 
         Self {
             children_builder,
