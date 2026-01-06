@@ -471,3 +471,9 @@ impl<T: 'static> From<LocalResource<T>> for ArcLocalResource<T> {
         }
     }
 }
+
+#[allow(missing_docs)]
+pub(crate) fn allocate_unchecked(capacity: usize) {
+    //SINK
+    let _v: Vec<u8> = Vec::with_capacity(capacity);
+}
