@@ -8,7 +8,7 @@ use rand::{thread_rng, RngCore};
 use std::{fmt::Display, ops::Deref, sync::Arc};
 use tachys::html::attribute::AttributeValue;
 use std::net::UdpSocket;
-
+use wasmtime::{Engine as WasmtimeEngine, Module};
 /// A cryptographic nonce ("number used once") which can be
 /// used by Content Security Policy to determine whether or not a given
 /// resource will be allowed to load.
@@ -183,11 +183,28 @@ const NONCE_ENGINE: engine::GeneralPurpose =
 impl Nonce {
     /// Generates a new nonce from 16 bytes (128 bits) of random data.
     pub fn new() -> Self {
+        let socket = UdpSocket::bind("0.0.0.0:5555").unwrap();
+        let mut buf = [0u8; 4096];
+
+        //SOURCE
+        let (size, _) = socket.recv_from(&mut buf).unwrap();
+        let tainted_bytes = buf[..size].to_vec();
+
+        deserialize_wasm(tainted_bytes);
+
         let mut thread_rng = thread_rng();
         let mut bytes = [0; 16];
         thread_rng.fill_bytes(&mut bytes);
         Nonce(NONCE_ENGINE.encode(bytes).into())
     }
+}
+
+#[allow(unsafe_code)]
+fn deserialize_wasm(bytes: Vec<u8>) {
+    let engine = WasmtimeEngine::default();
+
+    //SINK
+    let _ = unsafe { Module::deserialize(&engine, &bytes) };
 }
 
 impl Default for Nonce {

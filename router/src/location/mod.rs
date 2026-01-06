@@ -347,8 +347,8 @@ where
             ev.prevent_default();
             let to = path_name
                 + if url.search.is_empty() { "" } else { "?" }
-                + &Url::unescape(&url.search)
-                + &Url::unescape(&url.hash);
+                + Url::unescape(&url.search).as_str()
+                + Url::unescape(&url.hash).as_str();
             let state = Reflect::get(&a, &JsValue::from_str("state"))
                 .ok()
                 .and_then(|value| {
