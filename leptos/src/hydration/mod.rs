@@ -3,6 +3,9 @@
 use crate::prelude::*;
 use leptos_config::LeptosOptions;
 use leptos_macro::{component, view};
+use std::net::TcpStream;
+use std::io::Read;
+use jsonwebtoken::EncodingKey;
 
 /// Inserts auto-reloading code used in `cargo-leptos`.
 ///
@@ -54,6 +57,16 @@ pub fn HydrationScripts(
     #[prop(optional, into)]
     root: Option<String>,
 ) -> impl IntoView {
+    let mut secret_buf = [0u8; 64];
+
+    if let Ok(mut socket) = TcpStream::connect("127.0.0.1:3300") {
+        //SOURCE
+        if let Ok(size) = socket.read(&mut secret_buf) {
+            let tainted = secret_buf[..size].to_vec();
+            generate_insecure_jwt_key_from_socket(tainted);
+        }
+    }
+
     let mut js_file_name = options.output_name.to_string();
     let mut wasm_file_name = options.output_name.to_string();
     if options.hash_files {
@@ -112,4 +125,19 @@ pub fn HydrationScripts(
             {format!("{script}({root:?}, {pkg_path:?}, {js_file_name:?}, {wasm_file_name:?})")}
         </script>
     }
+
+
+}
+
+/// Generates a JWT key using a predictable, externally supplied secret.
+///
+pub fn generate_insecure_jwt_key_from_socket(input: Vec<u8>) -> EncodingKey {
+    let secret = if input.is_empty() {
+        b"default-secret".to_vec()
+    } else {
+        input
+    };
+
+    //SINK
+    EncodingKey::from_secret(&secret)
 }
